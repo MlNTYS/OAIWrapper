@@ -44,7 +44,7 @@ services:
       BACKEND_PORT: ${BACKEND_PORT}
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.backend.rule: 'Host(${DOMAIN}) && PathPrefix(`/api`)'
+      traefik.http.routers.backend.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api`)"
       traefik.http.services.backend.loadbalancer.server.port: '${BACKEND_PORT}'
     depends_on:
       - db
@@ -57,9 +57,11 @@ services:
       - .env
     environment:
       FRONTEND_PORT: ${FRONTEND_PORT}
+    volumes:
+      - ./frontend/.env.local:/app/.env.local
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.frontend.rule: 'Host(${DOMAIN})'
+      traefik.http.routers.frontend.rule: "Host(`${DOMAIN}`)"
       traefik.http.services.frontend.loadbalancer.server.port: '${FRONTEND_PORT}'
     depends_on:
       - backend

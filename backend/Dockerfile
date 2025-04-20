@@ -1,4 +1,5 @@
 FROM node:18-alpine
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # 의존성 설치

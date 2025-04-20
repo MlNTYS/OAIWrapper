@@ -27,6 +27,7 @@ model User {
   sessions       Session[]
   creditLedgers  CreditLedger[]
   usageLogs      UsageLog[]
+  conversations  Conversation[]
 
   @@map("users")
 }
@@ -66,7 +67,7 @@ model CreditLedger {
 model UsageLog {
   id                String   @id @default(uuid()) @db.Uuid
   user_id           String   @db.Uuid
-  model_id          String
+  model_id          String   @db.Uuid
   prompt_tokens     Int
   completion_tokens Int
   cost              Int
