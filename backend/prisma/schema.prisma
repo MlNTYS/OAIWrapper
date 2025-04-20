@@ -1,0 +1,79 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id    String @id
+  name  String
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  email          String          @unique
+  password_hash  String
+  is_verified    Boolean         @default(false)
+  role_id        String
+  current_credit Int             @default(0) @map("current_credit")
+  created_at     DateTime        @default(now())
+  role           Role            @relation(fields: [role_id], references: [id])
+  sessions       Session[]
+  creditLedgers  CreditLedger[]
+  usageLogs      UsageLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
+  refresh_token String
+  expires_at    DateTime
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Model {
+  id         String     @id
+  name       String
+  cost       Int
+  is_enabled Boolean    @default(true)
+  usageLogs  UsageLog[]
+
+  @@map("models")
+}
+
+model CreditLedger {
+  id      String   @id @default(uuid()) @db.Uuid
+  user_id String   @db.Uuid
+  delta   Int
+  reason  String
+  at      DateTime @default(now())
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("credit_ledgers")
+}
+
+model UsageLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  user_id           String   @db.Uuid
+  model_id          String
+  prompt_tokens     Int
+  completion_tokens Int
+  cost              Int
+  at                DateTime @default(now())
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  model             Model    @relation(fields: [model_id], references: [id])
+
+  @@map("usage_logs")
+}
+
+// 모델 정의는 이후에 추가하세요. 

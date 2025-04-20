@@ -1,0 +1,10 @@
+# Node modules
+node_modules/
+# dotenv environment variables
+.env
+# Logs
+npm-debug.log*
+# Next.js build outputs
+.next/
+# Prisma 매이그레이션 파일
+/prisma/migrations 
