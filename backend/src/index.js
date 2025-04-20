@@ -1,6 +1,13 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const argon2 = require('argon2');
+const authRoutes = require('./auth/routes');
+const userRoutes = require('./users/routes');
+const errorHandler = require('./middlewares/errorHandler');
+const cors = require('cors');
 
 dotenv.config();
 
@@ -9,10 +16,19 @@ const port = process.env.BACKEND_PORT || 3001;
 const prisma = new PrismaClient();
 
 app.use(express.json());
+app.use(cookieParser());
+app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Auth 라우터 등록
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+
+// 에러 핸들러 등록
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);

@@ -21,7 +21,7 @@ services:
       DOMAIN: ${DOMAIN}
 
   db:
-    image: postgres:15
+    image: postgres:17
     restart: always
     env_file:
       - .env
@@ -39,6 +39,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    entrypoint: ["./docker-entrypoint.sh"]
     env_file:
       - .env
     environment:
