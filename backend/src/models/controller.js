@@ -2,9 +2,10 @@ const prisma = require('../prisma');
 
 async function getAvailableModels(req, res, next) {
   try {
+    const filter = req.userRole === 'ADMIN' ? {} : { is_enabled: true };
     const models = await prisma.model.findMany({
-      where: { is_enabled: true },
-      select: { id: true, api_name: true, name: true, cost: true }
+      where: filter,
+      select: { id: true, api_name: true, name: true, cost: true, is_enabled: true }
     });
     res.json(models);
   } catch (err) {
@@ -48,4 +49,14 @@ async function updateModel(req, res, next) {
   }
 }
 
-module.exports = { getAvailableModels, createModel, updateModel }; 
+// 모델 삭제 (ADMIN)
+async function deleteModel(req, res, next) {
+  try {
+    await prisma.model.delete({ where: { id: req.params.id } });
+    res.sendStatus(204);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getAvailableModels, createModel, updateModel, deleteModel }; 

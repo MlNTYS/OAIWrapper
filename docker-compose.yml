@@ -55,12 +55,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_ADMIN_PATH: ${NEXT_PUBLIC_ADMIN_PATH}
     env_file:
       - .env
     environment:
       FRONTEND_PORT: ${FRONTEND_PORT}
-    volumes:
-      - ./frontend/.env.local:/app/.env.local
     labels:
       traefik.enable: 'true'
       traefik.http.routers.frontend.rule: "Host(`${DOMAIN}`)"

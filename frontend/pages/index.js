@@ -6,7 +6,7 @@ export default function Home() {
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
-      router.replace('/dashboard');
+      router.replace('/conversations/new');
     } else {
       router.replace('/login');
     }

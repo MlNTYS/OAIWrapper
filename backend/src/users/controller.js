@@ -41,12 +41,13 @@ async function createUser(req, res, next) {
 
 async function updateUser(req, res, next) {
   try {
-    const { email, password, role_id, is_verified } = req.body;
+    const { email, password, role_id, is_verified, current_credit } = req.body;
     const data = {};
     if (email) data.email = email;
     if (password) data.password_hash = await argon2.hash(password);
     if (role_id) data.role_id = role_id;
     if (typeof is_verified !== 'undefined') data.is_verified = is_verified;
+    if (typeof current_credit !== 'undefined') data.current_credit = current_credit;
 
     const user = await prisma.user.update({
       where: { id: req.params.id },

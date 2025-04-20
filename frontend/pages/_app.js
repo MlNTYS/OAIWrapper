@@ -5,10 +5,14 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import '../styles/globals.css';
 import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
+import api from '../utils/api';
+import useAuthStore from '../store/useAuthStore';
 
 export default function App({ Component, pageProps }) {
   const [colorScheme, setColorScheme] = useState('light');
   const router = useRouter();
+  const setUser = useAuthStore((state) => state.setUser);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     const stored = localStorage.getItem('color-scheme');
@@ -23,7 +27,21 @@ export default function App({ Component, pageProps }) {
     } else if (token && router.pathname === '/login') {
       router.replace('/conversations/new');
     }
-  }, [router.pathname]);
+    if (token && !user) {
+      api.get('/auth/me')
+        .then((res) => setUser(res.data))
+        .catch(() => {
+          useAuthStore.getState().logout();
+          router.replace('/login');
+        });
+    }
+    const adminPath = process.env.NEXT_PUBLIC_ADMIN_PATH;
+    if (token && router.pathname.startsWith(`/${adminPath}`)) {
+      if (user && user.role_id !== 'ADMIN') {
+        router.replace('/login');
+      }
+    }
+  }, [router.pathname, user]);
 
   const toggleColorScheme = (value) => {
     const next = value || (colorScheme === 'dark' ? 'light' : 'dark');
@@ -37,7 +55,7 @@ export default function App({ Component, pageProps }) {
     <ColorSchemeProvider colorScheme={colorScheme} toggleColorScheme={toggleColorScheme}>
       <MantineProvider withGlobalStyles withNormalizeCSS theme={{ colorScheme }}>
         <QueryClientProvider client={queryClient}>
-          {router.pathname === '/login' ? (
+          {router.pathname === '/login' || router.pathname.startsWith(`/${process.env.NEXT_PUBLIC_ADMIN_PATH}`) ? (
             <Component {...pageProps} />
           ) : (
             <Layout>

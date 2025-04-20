@@ -18,6 +18,9 @@ const app = express();
 const port = process.env.BACKEND_PORT || 3001;
 const prisma = new PrismaClient();
 
+// Trust proxy headers (for Express behind Traefik)
+app.set('trust proxy', true);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));

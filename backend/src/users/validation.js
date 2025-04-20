@@ -12,6 +12,7 @@ const updateUserRules = [
   check('password').optional().isLength({ min: 6 }),
   check('role_id').optional().isIn(['USER', 'ADMIN']),
   check('is_verified').optional().isBoolean(),
+  check('current_credit').optional().isInt({ min: 0 }).withMessage('Credit must be a non-negative integer'),
 ];
 
 const idParamRule = [

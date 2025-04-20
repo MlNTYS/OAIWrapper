@@ -27,7 +27,7 @@ router.post('/stream', authMiddleware, async (req, res) => {
       const titlePrompt = firstUser?.content || messages.map(m => m.content).join('\n');
       const titleRes = await axios.post(OPENAI_API,
         { model: 'gpt-4.1-nano-2025-04-14', messages: [
-            { role: 'system', content: 'Generate a short title for this conversation.' },
+            { role: 'system', content: 'Generate a short title for this conversation. Do not answer it directly, just generate the title.' },
             { role: 'user', content: titlePrompt }
           ], max_tokens: 10 },
         { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
@@ -49,8 +49,8 @@ router.post('/stream', authMiddleware, async (req, res) => {
     await prisma.message.create({ data: { conversation_id: convId, role: 'user', content: lastUser.content } });
   }
 
-  // 모델 조회 및 사용 가능 여부 확인
-  const modelInfo = await prisma.model.findUnique({ where: { id: model } });
+  // 모델 조회 및 사용 가능 여부 확인 (api_name 기반 조회)
+  const modelInfo = await prisma.model.findUnique({ where: { api_name: model } });
   if (!modelInfo || !modelInfo.is_enabled) {
     return res.status(400).json({ error: 'Model not available' });
   }
@@ -116,8 +116,8 @@ router.post('/stream', authMiddleware, async (req, res) => {
     openaiRes.data.on('end', async () => {
       // assistant 메시지 저장
       await prisma.message.create({ data: { conversation_id: convId, role: 'assistant', content: assistantContent } });
-      // 사용 기록 생성
-      await prisma.usageLog.create({ data: { user_id: userId, model_id: model, prompt_tokens: 0, completion_tokens: 0, cost: modelInfo.cost } });
+      // 사용 기록 생성 (modelInfo.id 사용)
+      await prisma.usageLog.create({ data: { user_id: userId, model_id: modelInfo.id, prompt_tokens: 0, completion_tokens: 0, cost: modelInfo.cost } });
     });
   } catch (err) {
     // 클라이언트 취소 에러: 추가 처리 없이 종료

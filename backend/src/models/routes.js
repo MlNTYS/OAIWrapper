@@ -3,7 +3,7 @@ const validate = require('../middlewares/validate');
 const { createModelRules, updateModelRules, idParamRule } = require('./validation');
 const authMiddleware = require('../auth/middleware');
 const { adminOnly } = require('../users/middleware');
-const { getAvailableModels, createModel, updateModel } = require('./controller');
+const { getAvailableModels, createModel, updateModel, deleteModel } = require('./controller');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
@@ -16,5 +16,8 @@ router.post('/', authMiddleware, adminOnly, validate(createModelRules), createMo
 
 // 모델 수정 (ADMIN)
 router.patch('/:id', authMiddleware, validate(idParamRule), adminOnly, validate(updateModelRules), updateModel);
+
+// 모델 삭제 (ADMIN)
+router.delete('/:id', authMiddleware, validate(idParamRule), adminOnly, deleteModel);
 
 module.exports = router; 

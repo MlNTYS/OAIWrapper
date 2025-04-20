@@ -11,7 +11,7 @@ export default function ChatInput({ conversationId, onSend, onReceive, onNewConv
   const model = useModelStore((state) => state.selectedModel);
 
   const handleSubmit = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim() || isStreaming || !model?.api_name) return;
     const userMessage = { role: 'user', content: input };
     onSend(userMessage);
     setInput('');
@@ -26,9 +26,14 @@ export default function ChatInput({ conversationId, onSend, onReceive, onNewConv
 
     controllerRef.current = new AbortController();
     try {
+      // Attach JWT token for authorization
+      const accessToken = localStorage.getItem('accessToken');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         credentials: 'include',
         body: JSON.stringify(body),
         signal: controllerRef.current.signal,
@@ -96,7 +101,7 @@ export default function ChatInput({ conversationId, onSend, onReceive, onNewConv
           중단
         </Button>
       ) : (
-        <Button onClick={handleSubmit}>전송</Button>
+        <Button onClick={handleSubmit} disabled={!model?.api_name}>전송</Button>
       )}
     </Group>
   );
