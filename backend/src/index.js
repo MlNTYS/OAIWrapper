@@ -8,6 +8,9 @@ const authRoutes = require('./auth/routes');
 const userRoutes = require('./users/routes');
 const errorHandler = require('./middlewares/errorHandler');
 const cors = require('cors');
+const chatRoutes = require('./chat/routes');
+const modelRoutes = require('./models/routes');
+const conversationRoutes = require('./conversations/routes');
 
 dotenv.config();
 
@@ -26,6 +29,9 @@ app.get('/api/health', (req, res) => {
 // Auth 라우터 등록
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/models', modelRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 // 에러 핸들러 등록
 app.use(errorHandler);

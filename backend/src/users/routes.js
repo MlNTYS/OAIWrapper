@@ -1,24 +1,25 @@
 const express = require('express');
 const validate = require('../middlewares/validate');
+const authMiddleware = require('../auth/middleware');
 const { createUserRules, updateUserRules, idParamRule } = require('./validation');
-const { adminOnly, ownerOrAdmin } = require('./users/middleware');
+const { adminOnly, ownerOrAdmin } = require('./middleware');
 const { getUsers, getUser, createUser, updateUser, deleteUser } = require('./controller');
 
 const router = express.Router();
 
 // 전체 유저 조회 (ADMIN)
-router.get('/', adminOnly, getUsers);
+router.get('/', authMiddleware, adminOnly, getUsers);
 
 // 개별 유저 조회 (ADMIN or 본인)
-router.get('/:id', validate(idParamRule), ownerOrAdmin, getUser);
+router.get('/:id', authMiddleware, validate(idParamRule), ownerOrAdmin, getUser);
 
 // 유저 생성 (ADMIN)
-router.post('/', adminOnly, validate(createUserRules), createUser);
+router.post('/', authMiddleware, adminOnly, validate(createUserRules), createUser);
 
 // 유저 수정 (ADMIN or 본인)
-router.patch('/:id', validate(idParamRule), ownerOrAdmin, validate(updateUserRules), updateUser);
+router.patch('/:id', authMiddleware, validate(idParamRule), ownerOrAdmin, validate(updateUserRules), updateUser);
 
 // 유저 삭제 (ADMIN)
-router.delete('/:id', validate(idParamRule), adminOnly, deleteUser);
+router.delete('/:id', authMiddleware, validate(idParamRule), adminOnly, deleteUser);
 
 module.exports = router; 

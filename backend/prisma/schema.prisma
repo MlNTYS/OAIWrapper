@@ -42,7 +42,8 @@ model Session {
 }
 
 model Model {
-  id         String     @id
+  id         String     @id @default(uuid()) @db.Uuid
+  api_name   String     @unique
   name       String
   cost       Int
   is_enabled Boolean    @default(true)
@@ -74,6 +75,30 @@ model UsageLog {
   model             Model    @relation(fields: [model_id], references: [id])
 
   @@map("usage_logs")
+}
+
+// 대화 기록 저장용 모델
+model Conversation {
+  id         String      @id @default(uuid()) @db.Uuid
+  user_id    String      @db.Uuid
+  title      String?
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+  messages   Message[]
+  user       User        @relation(fields: [user_id], references: [id])
+
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(uuid()) @db.Uuid
+  conversation_id String       @db.Uuid
+  role            String
+  content         String
+  created_at      DateTime     @default(now())
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@map("messages")
 }
 
 // 모델 정의는 이후에 추가하세요. 

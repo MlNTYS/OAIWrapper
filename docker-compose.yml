@@ -4,18 +4,15 @@ services:
   traefik:
     image: traefik:v3
     command:
-      - --api.insecure=true
-      - --providers.docker=true
-      - --entryPoints.web.address=:80
-      - --entryPoints.websecure.address=:443
-      - --certificatesResolvers.le.acme.email=${LETSENCRYPT_EMAIL}
-      - --certificatesResolvers.le.acme.storage=/letsencrypt/acme.json
-      - --certificatesResolvers.le.acme.httpChallenge.entryPoint=web
+      - --configFile=/etc/traefik/traefik.yml
+    env_file:
+      - .env
     ports:
       - '${HOST_PORT}:80'
       - '${HTTPS_PORT}:443'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./letsencrypt:/letsencrypt
     environment:
       DOMAIN: ${DOMAIN}
