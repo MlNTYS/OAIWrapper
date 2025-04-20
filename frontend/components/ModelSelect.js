@@ -1,0 +1,39 @@
+import { useEffect } from 'react';
+import { Select } from '@mantine/core';
+import { useQuery } from '@tanstack/react-query';
+import api from '../utils/api';
+import useModelStore from '../store/useModelStore';
+
+export default function ModelSelect() {
+  const { data: models = [] } = useQuery(
+    ['models'],
+    () => api.get('/models').then((res) => res.data),
+    { staleTime: 1000 * 60 }
+  );
+  const selected = useModelStore((state) => state.selectedModel);
+  const setSelected = useModelStore((state) => state.setSelectedModel);
+
+  useEffect(() => {
+    if (!selected && models.length > 0) {
+      setSelected(models[0]);
+    }
+  }, [models]);
+
+  const dataOptions = models.map((m) => ({
+    value: m.id.toString(),
+    label: m.name,
+  }));
+
+  return (
+    <Select
+      data={dataOptions}
+      value={selected ? selected.id.toString() : null}
+      onChange={(val) => {
+        const model = models.find((m) => m.id.toString() === val);
+        if (model) setSelected(model);
+      }}
+      placeholder="모델 선택"
+      style={{ width: 200 }}
+    />
+  );
+} 
