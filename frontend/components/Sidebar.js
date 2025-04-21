@@ -1,10 +1,105 @@
 import { useEffect, useState } from 'react';
-import { Navbar, ScrollArea, Button, NavLink, Text, useMantineTheme, Menu, UnstyledButton, Group, Avatar, Badge } from '@mantine/core';
+import { 
+  Navbar, ScrollArea, Button, NavLink, Text, 
+  useMantineTheme, Menu, UnstyledButton, 
+  Group, Avatar, createStyles, 
+  Tooltip, Divider, Box, ActionIcon
+} from '@mantine/core';
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
+import { 
+  IconPlus, IconMessage, IconChevronRight, 
+  IconSettings, IconLogout, IconCoin
+} from '@tabler/icons-react';
 import api from '../utils/api';
 import useConversationStore from '../store/useConversationStore';
 import useAuthStore from '../store/useAuthStore';
+
+const useStyles = createStyles((theme) => ({
+  navbar: {
+    backgroundColor: theme.colors.dark[9],
+    borderRight: '1px solid rgba(42, 42, 45, 0.7)',
+    boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)',
+    width: 260,
+  },
+
+  userSection: {
+    padding: theme.spacing.md,
+    borderBottom: `1px solid ${theme.fn.rgba(theme.colors.dark[7], 0.5)}`,
+    marginBottom: theme.spacing.sm,
+  },
+
+  creditInfo: {
+    padding: '6px 8px',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.fn.rgba(theme.colors.dark[6], 0.6),
+    fontSize: theme.fontSizes.sm,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  
+  creditAmount: {
+    color: theme.colors.blue[4],
+    fontWeight: 500,
+  },
+  
+  avatar: {
+    cursor: 'pointer',
+    backgroundColor: theme.colors.dark[7],
+  },
+  
+  newChatButton: {
+    backgroundColor: theme.colors['royal-blue'][7],
+    height: 38,
+    borderRadius: theme.radius.md,
+    fontWeight: 500,
+    
+    '&:hover': {
+      backgroundColor: theme.colors['royal-blue'][6],
+    }
+  },
+  
+  navLinkItem: {
+    borderRadius: theme.radius.md,
+    marginBottom: 6,
+    padding: '10px 12px',
+    
+    '&:hover': {
+      backgroundColor: theme.fn.rgba(theme.colors.dark[7], 0.8),
+    },
+    
+    '&[data-active]': {
+      backgroundColor: `${theme.fn.rgba(theme.colors['sage-green'][9], 0.2)} !important`,
+      borderLeft: `2px solid ${theme.colors['sage-green'][5]}`,
+    }
+  },
+  
+  scrollArea: {
+    padding: `${theme.spacing.xs}px ${theme.spacing.xs}px`,
+  },
+  
+  menuDropdown: {
+    border: `1px solid ${theme.colors.dark[6]}`,
+    backgroundColor: theme.colors.dark[8],
+  },
+  
+  menuItem: {
+    borderRadius: theme.radius.sm,
+    
+    '&:hover': {
+      backgroundColor: theme.colors.dark[7],
+    }
+  },
+  
+  chevronIcon: {
+    color: theme.colors.dark[3],
+  },
+  
+  conversationIcon: {
+    color: theme.colors.dark[3],
+  }
+}));
 
 export default function Sidebar() {
   const router = useRouter();
@@ -14,6 +109,7 @@ export default function Sidebar() {
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
   const [credit, setCredit] = useState(0);
+  const { classes } = useStyles();
 
   const { data, isLoading } = useQuery(
     ['conversations'],
@@ -64,102 +160,112 @@ export default function Sidebar() {
 
   return (
     <Navbar 
-      width={{ base: 250 }} 
-      p="xs" 
+      width={{ base: 260 }} 
+      p={0} 
       height="100%" 
-      bg={theme.colors.dark[8]}
-      sx={{
-        borderRight: `1px solid ${theme.colors.dark[7]}`,
-      }}
+      className={classes.navbar}
     >
-      <Navbar.Section>
-        <Group position="apart" align="center" mb="xs">
-          <Badge
-            color="royal-blue"
-            variant="filled"
-            radius="sm"
-            size="md"
-            sx={{
-              paddingLeft: 12,
-              paddingRight: 12
-            }}
-          >
-            크레딧: {credit}
-          </Badge>
+      <Navbar.Section className={classes.userSection}>
+        <Group position="apart" align="center" mb="sm">
+          <Group spacing="sm">
+            <Avatar 
+              size="sm" 
+              radius="xl"
+              className={classes.avatar}
+            >
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            </Avatar>
+            <Text size="sm" lineClamp={1}>
+              {user?.email || '로딩 중...'}
+            </Text>
+          </Group>
+          
           <Menu
             position="bottom-end"
             withArrow
             shadow="md"
-            width={200}
+            width={180}
+            styles={{
+              dropdown: classes.menuDropdown,
+              item: classes.menuItem,
+            }}
           >
             <Menu.Target>
-              <UnstyledButton>
-                <Avatar 
-                  size="md" 
-                  color="royal-blue" 
-                  radius="xl"
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.1)'
-                    }
-                  }}
-                />
-              </UnstyledButton>
+              <ActionIcon size="sm" variant="subtle" radius="xl">
+                <IconSettings size={14} />
+              </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Label>계정</Menu.Label>
-              <Menu.Item disabled>{user?.email || '로딩 중...'}</Menu.Item>
-              <Menu.Item disabled>크레딧: {credit}</Menu.Item>
-              <Menu.Divider />
-              <Menu.Item color="burgundy" onClick={handleLogout}>로그아웃</Menu.Item>
+              <Menu.Item 
+                icon={<IconSettings size={14} stroke={1.5} />}
+                onClick={() => router.push('/settings')}
+              >
+                설정
+              </Menu.Item>
+              
+              <Menu.Item 
+                color="red"
+                icon={<IconLogout size={14} stroke={1.5} />}
+                onClick={handleLogout}
+              >
+                로그아웃
+              </Menu.Item>
             </Menu.Dropdown>
           </Menu>
         </Group>
+        
+        <Group position="apart" mb="md">
+          <div className={classes.creditInfo}>
+            <IconCoin size={14} stroke={1.5} />
+            <Text size="sm">
+              Credit: <span className={classes.creditAmount}>{credit.toLocaleString()}</span>
+            </Text>
+          </div>
+        </Group>
+        
         <Button 
           fullWidth 
-          mb="sm" 
           onClick={() => router.push('/conversations/new')}
-          color="royal-blue"
-          variant="filled"
-          sx={{
-            backgroundColor: theme.colors['royal-blue'][7],
-            transition: 'background-color 200ms ease',
-            '&:hover': {
-              backgroundColor: theme.colors['royal-blue'][6],
-            }
-          }}
+          className={classes.newChatButton}
+          leftIcon={<IconPlus size={16} />}
         >
           새 대화
         </Button>
       </Navbar.Section>
-      <Navbar.Section grow component={ScrollArea} mx="-xs" px="xs">
-        {isLoading && <Text align="center" color="dimmed">로딩 중...</Text>}
-        {!isLoading && conversations.length === 0 && <Text align="center" color="dimmed">대화 없음</Text>}
+      
+      <Navbar.Section grow component={ScrollArea} className={classes.scrollArea}>
+        {isLoading && (
+          <Text align="center" color="dimmed" size="sm" py="lg">
+            대화 내역 로딩 중...
+          </Text>
+        )}
+        
+        {!isLoading && conversations.length === 0 && (
+          <Text align="center" color="dimmed" size="sm" py="lg">
+            대화 내역이 없습니다
+          </Text>
+        )}
+        
         {!isLoading && conversations.map((conv) => (
           <NavLink
             key={conv.id}
-            label={conv.title || 'Untitled'}
-            description={new Date(conv.updated_at).toLocaleString()}
+            label={<Text fw={500} fz="sm" lineClamp={1}>{conv.title || '제목 없음'}</Text>}
+            description={<Text size="xs" color="dimmed">{new Date(conv.updated_at).toLocaleString('ko-KR', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</Text>}
             onClick={() => handleSelect(conv.id)}
             color="sage-green"
             active={router.query.id === conv.id}
-            sx={(theme) => ({
-              borderRadius: theme.radius.sm,
-              marginBottom: 8,
-              transition: 'all 0.2s ease',
-              border: router.query.id === conv.id ? 
-                `1px solid ${theme.colors['sage-green'][6]}` : 
-                '1px solid transparent',
-              '&:hover': {
-                backgroundColor: theme.colors.dark[7],
-                transform: 'translateX(2px)',
-              },
-              '&[data-active]': {
-                backgroundColor: `${theme.fn.rgba(theme.colors['sage-green'][9], 0.3)} !important`,
-              }
-            })}
+            className={classes.navLinkItem}
+            icon={
+              <IconMessage size={16} className={classes.conversationIcon} />
+            }
+            rightSection={
+              <IconChevronRight size={14} className={classes.chevronIcon} />
+            }
           />
         ))}
       </Navbar.Section>
