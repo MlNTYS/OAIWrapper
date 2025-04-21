@@ -2,10 +2,13 @@ const express = require('express');
 const validate = require('../middlewares/validate');
 const { idParamRule } = require('./validation');
 const authMiddleware = require('../auth/middleware');
-const { getConversations, getConversation, deleteConversation } = require('./controller');
+const { getConversations, getConversation, deleteConversation, createConversation } = require('./controller');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// 대화 생성 (rate limit 적용)
+router.post('/', rateLimit({ windowMs: 60 * 1000, max: 30 }), authMiddleware, createConversation);
 
 // 대화 리스트 조회 (rate limit 적용)
 router.get('/', rateLimit({ windowMs: 60 * 1000, max: 30 }), authMiddleware, getConversations);

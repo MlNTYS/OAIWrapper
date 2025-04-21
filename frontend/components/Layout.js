@@ -1,6 +1,5 @@
 import { Box, LoadingOverlay, Notification, AppShell } from '@mantine/core';
 import useUIStore from '../store/useUIStore';
-import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 
 export default function Layout({ children }) {
@@ -21,7 +20,7 @@ export default function Layout({ children }) {
         </Notification>
       )}
 
-      <AppShell padding="md" header={<AppHeader />} navbar={<Sidebar />}>
+      <AppShell padding="md" navbar={<Sidebar />}>
         {children}
       </AppShell>
     </Box>

@@ -1,11 +1,10 @@
-import { Header, Group, Anchor, Text } from '@mantine/core';
+import { Header, Group, Anchor, Text, useMantineTheme } from '@mantine/core';
 import Link from 'next/link';
-import { useMantineColorScheme } from '@mantine/core';
 import { useRouter } from 'next/router';
 import useAuthStore from '../store/useAuthStore';
 
 export default function AdminHeader() {
-  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const theme = useMantineTheme();
   const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
 
@@ -15,24 +14,27 @@ export default function AdminHeader() {
   };
 
   return (
-    <Header height={60} p="xs">
+    <Header height={60} p="xs" bg={theme.black}>
       <Group position="apart" align="center" sx={{ height: '100%' }}>
         <Group>
           <Link href="/admin/users" passHref>
-            <Anchor><Text weight={500}>Users</Text></Anchor>
+            <Anchor c={theme.colors['royal-blue'][4]}>
+              <Text weight={500}>Users</Text>
+            </Anchor>
           </Link>
           <Link href="/admin/models" passHref>
-            <Anchor><Text weight={500}>Models</Text></Anchor>
+            <Anchor c={theme.colors['royal-blue'][4]}>
+              <Text weight={500}>Models</Text>
+            </Anchor>
           </Link>
           <Link href="/admin/conversations" passHref>
-            <Anchor><Text weight={500}>Conversations</Text></Anchor>
+            <Anchor c={theme.colors['royal-blue'][4]}>
+              <Text weight={500}>Conversations</Text>
+            </Anchor>
           </Link>
         </Group>
         <Group>
-          <Anchor onClick={() => toggleColorScheme()}>
-            {colorScheme === 'dark' ? '☀️' : '🌙'}
-          </Anchor>
-          <Anchor color="red" onClick={handleLogout}>
+          <Anchor color="burgundy" onClick={handleLogout}>
             Logout
           </Anchor>
         </Group>

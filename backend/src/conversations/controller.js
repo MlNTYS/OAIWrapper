@@ -53,4 +53,14 @@ async function deleteConversation(req, res, next) {
   }
 }
 
-module.exports = { getConversations, getConversation, deleteConversation }; 
+// 새로운 대화 생성 함수: user_id로 대화를 생성하고 UUID를 반환합니다.
+async function createConversation(req, res, next) {
+  try {
+    const conv = await prisma.conversation.create({ data: { user_id: req.userId } });
+    return res.status(201).json({ id: conv.id });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getConversations, getConversation, deleteConversation, createConversation }; 
