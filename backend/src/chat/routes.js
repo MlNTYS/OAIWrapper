@@ -46,8 +46,8 @@ router.post(
         const firstUser = messages.find(m => m.role === 'user');
         const titlePrompt = firstUser?.content || messages.map(m => m.content).join('\n');
         const titleRes = await axios.post(OPENAI_API,
-          { model: 'gpt-4.1-nano-2025-04-14', messages: [
-              { role: 'system', content: 'Generate a short title for this conversation. Do not answer it directly, just generate the title.' },
+          { model: 'gpt-4.1-mini-2025-04-14', messages: [
+              { role: 'system', content: 'Generate a short title for this conversation. Do not answer it directly, Write it in language of the conversation.' },
               { role: 'user', content: titlePrompt }
             ], max_tokens: 10 },
           { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
@@ -133,9 +133,14 @@ router.post(
     });
 
     try {
+      // Prepare payload and include reasoning_effort if inference model
+      const payload = { model, messages, stream: true };
+      if (modelInfo.is_inference_model) {
+        payload.reasoning_effort = modelInfo.reasoning_effort;
+      }
       const openaiRes = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        { model, messages, stream: true },
+        OPENAI_API,
+        payload,
         {
           headers: {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,

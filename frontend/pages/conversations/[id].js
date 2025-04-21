@@ -21,12 +21,13 @@ export default function ConversationPage() {
   );
 
   useEffect(() => {
-    if (conv && conv.messages) {
-      setMessages(conv.messages);
-      setTitle(conv.title);
-    } else if (isNew) {
+    if (isNew) {
       setMessages([]);
       setTitle('새 대화');
+    } else if (conv && conv.messages) {
+      setTitle(conv.title);
+      // 서버에서 가져온 메시지로 초기화
+      setMessages(conv.messages);
     }
   }, [conv, isNew]);
 
@@ -51,6 +52,7 @@ export default function ConversationPage() {
   };
 
   const handleNewConversation = (convId) => {
+    // 전체 페이지 리렌더링을 위해 shallow 옵션 제거
     router.replace(`/conversations/${convId}`);
   };
 

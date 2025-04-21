@@ -6,6 +6,8 @@ const createModelRules = [
   check('name').notEmpty().withMessage('Model name is required'),
   check('cost').isInt({ min: 0 }).withMessage('Cost must be a non-negative integer'),
   check('is_enabled').optional().isBoolean().withMessage('is_enabled must be boolean'),
+  check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
+  check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
 ];
 
 const updateModelRules = [
@@ -14,6 +16,8 @@ const updateModelRules = [
   check('name').optional().notEmpty().withMessage('Model name cannot be empty'),
   check('cost').optional().isInt({ min: 0 }).withMessage('Cost must be a non-negative integer'),
   check('is_enabled').optional().isBoolean().withMessage('is_enabled must be boolean'),
+  check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
+  check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
 ];
 
 const idParamRule = [
