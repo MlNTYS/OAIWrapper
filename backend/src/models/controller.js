@@ -5,7 +5,8 @@ async function getAvailableModels(req, res, next) {
     const filter = req.userRole === 'ADMIN' ? {} : { is_enabled: true };
     const models = await prisma.model.findMany({
       where: filter,
-      select: { id: true, api_name: true, name: true, cost: true, is_enabled: true, is_inference_model: true, reasoning_effort: true, system_message: true }
+      orderBy: { display_order: 'asc' },
+      select: { id: true, api_name: true, name: true, cost: true, is_enabled: true, is_inference_model: true, reasoning_effort: true, system_message: true, display_order: true }
     });
     res.json(models);
   } catch (err) {
@@ -15,11 +16,11 @@ async function getAvailableModels(req, res, next) {
 
 async function createModel(req, res, next) {
   try {
-    const { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message } = req.body;
+    const { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message, display_order } = req.body;
     const model = await prisma.model.create({
-      data: { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message }
+      data: { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message, display_order }
     });
-    res.status(201).json({ id: model.id, api_name: model.api_name, name: model.name, cost: model.cost, is_enabled: model.is_enabled, is_inference_model: model.is_inference_model, reasoning_effort: model.reasoning_effort, system_message: model.system_message });
+    res.status(201).json({ id: model.id, api_name: model.api_name, name: model.name, cost: model.cost, is_enabled: model.is_enabled, is_inference_model: model.is_inference_model, reasoning_effort: model.reasoning_effort, system_message: model.system_message, display_order: model.display_order });
   } catch (err) {
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'api_name already exists' });
@@ -30,7 +31,7 @@ async function createModel(req, res, next) {
 
 async function updateModel(req, res, next) {
   try {
-    const { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message } = req.body;
+    const { api_name, name, cost, is_enabled, is_inference_model, reasoning_effort, system_message, display_order } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (cost !== undefined) data.cost = cost;
@@ -39,11 +40,12 @@ async function updateModel(req, res, next) {
     if (is_inference_model !== undefined) data.is_inference_model = is_inference_model;
     if (reasoning_effort !== undefined) data.reasoning_effort = reasoning_effort;
     if (system_message !== undefined) data.system_message = system_message;
+    if (display_order !== undefined) data.display_order = display_order;
     const model = await prisma.model.update({
       where: { id: req.params.id },
       data
     });
-    res.json({ id: model.id, api_name: model.api_name, name: model.name, cost: model.cost, is_enabled: model.is_enabled, is_inference_model: model.is_inference_model, reasoning_effort: model.reasoning_effort, system_message: model.system_message });
+    res.json({ id: model.id, api_name: model.api_name, name: model.name, cost: model.cost, is_enabled: model.is_enabled, is_inference_model: model.is_inference_model, reasoning_effort: model.reasoning_effort, system_message: model.system_message, display_order: model.display_order });
   } catch (err) {
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'api_name already exists' });

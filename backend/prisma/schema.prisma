@@ -58,6 +58,7 @@ model Model {
   is_inference_model Boolean @default(false) @map("is_inference_model")
   reasoning_effort     ReasoningEffort? @map("reasoning_effort")
   system_message       String?             @map("system_message")
+  display_order        Int                 @default(0)
   usageLogs  UsageLog[]
 
   @@map("models")

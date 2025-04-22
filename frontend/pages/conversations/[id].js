@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { Container, Title, Text, Stack, Box, Divider } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
@@ -20,9 +20,15 @@ export default function ConversationPage() {
     { enabled: !!id && !isNew }
   );
 
-  // conversationId가 변경되면 이전 메시지 초기화
+  // conversation id 변경 시 이전 메시지 초기화 (new->conv 케이스만 제외)
+  const prevIdRef = useRef(id);
   useEffect(() => {
-    setMessages([]);
+    const oldId = prevIdRef.current;
+    const newId = id;
+    if (newId !== oldId && !(oldId === 'new' && newId !== 'new')) {
+      setMessages([]);
+    }
+    prevIdRef.current = newId;
   }, [id]);
 
   // 서버 데이터 로드 시 메시지 및 타이틀 설정
@@ -31,7 +37,8 @@ export default function ConversationPage() {
       setTitle('새 대화');
     } else if (conv && conv.messages) {
       setTitle(conv.title);
-      setMessages(conv.messages);
+      // 로컬 메시지가 없을 때만 서버 메시지로 초기화
+      setMessages((prev) => prev.length === 0 ? conv.messages : prev);
     }
   }, [conv, isNew]);
 
@@ -53,11 +60,6 @@ export default function ConversationPage() {
     } else {
       setMessages((prev) => [...prev, message]);
     }
-  };
-
-  const handleNewConversation = (convId) => {
-    // 전체 페이지 리렌더링을 위해 shallow 옵션 제거
-    router.replace(`/conversations/${convId}`);
   };
 
   const handleTitle = (newTitle) => {
@@ -84,23 +86,26 @@ export default function ConversationPage() {
         display: 'flex',
         flexDirection: 'column',
       })}>
-        {isLoading && !isNew && <Text align="center">로딩 중...</Text>}
-        {(isNew || (!isNew && !isLoading && messages.length === 0)) && (
+        {/* 메시지 리스트: 로컬 state가 있으면 바로 표시 */}
+        {messages.map((msg, idx) => (
+          <MessageCard key={idx} content={msg.content} isUser={msg.role === 'user'} />
+        ))}
+        {/* 서버 로딩 중이고 메시지 없을 때만 로딩 표시 */}
+        {isLoading && messages.length === 0 && !isNew && (
+          <Text align="center">로딩 중...</Text>
+        )}
+        {/* 메시지 없고 로딩도 아니면 플레이스홀더 */}
+        {messages.length === 0 && (isNew || (!isNew && !isLoading)) && (
           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
             <Text align="center" size="lg">안녕하세요! 어떤 질문이 있으신가요?</Text>
           </Box>
         )}
-        {/* isLoading 중에는 메시지 매핑 건너뜀 */}
-        {!isLoading && messages.map((msg, idx) => (
-          <MessageCard key={idx} content={msg.content} isUser={msg.role === 'user'} />
-        ))}
       </Box>
       {/* Footer 고정 */}
       <Footer
         conversationId={isNew ? undefined : id}
         onSend={handleSend}
         onReceive={handleReceive}
-        onNewConversation={handleNewConversation}
         onTitle={handleTitle}
       />
     </Box>

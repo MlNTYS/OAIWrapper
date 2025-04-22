@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import ModelSelect from './ModelSelect';
 import useModelStore from '../store/useModelStore';
+import { useRouter } from 'next/router';
 
 const SIDEBAR_WIDTH = 256;          // 사이드바 실제 너비(px)
 
@@ -137,7 +138,7 @@ const useStyles = createStyles((theme, { offsetLeft }) => ({
   }
 }));
 
-export default function Footer({ conversationId, onSend, onReceive, onNewConversation, onTitle }) {
+export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const { classes } = useStyles({ offsetLeft: isDesktop ? SIDEBAR_WIDTH : 0 });
   const theme = useMantineTheme();
@@ -149,6 +150,7 @@ export default function Footer({ conversationId, onSend, onReceive, onNewConvers
   const lastUserMessageRef = useRef(null);
   const controllerRef = useRef(null);
   const localConvIdRef = useRef(conversationId);
+  const router = useRouter();
   
   useEffect(() => { localConvIdRef.current = conversationId; }, [conversationId]);
   useEffect(() => {
@@ -216,28 +218,31 @@ export default function Footer({ conversationId, onSend, onReceive, onNewConvers
     }
   };
 
-  // 최초 메시지 전송 핸들러
+  // 최초 메시지 전송 핸들러 (첫번째 방식)
   const handleSubmit = async () => {
     if (!input.trim() || isStreaming || !selectedModel?.api_name) return;
     const messageObj = { role: 'user', content: input };
-    onSend(messageObj);
+    // 입력 초기화 및 lastUserMessage 저장
     setInput('');
     lastUserMessageRef.current = messageObj;
+
     let convId = localConvIdRef.current;
     if (!convId) {
       try {
+        // 1) 새 대화 생성
         const res = await api.post('/conversations');
         convId = res.data.id;
         localConvIdRef.current = convId;
-        onNewConversation(convId);
-        queryClient.invalidateQueries(['conversations']);
-        startStream(messageObj, convId);
+        // 2) URL 업데이트 대기 (shallow routing)
+        await router.replace(`/conversations/${convId}`, undefined, { shallow: true });
       } catch (err) {
         console.error('Conversation 생성 실패', err);
         setShowRetry(true);
+        return;
       }
-      return;
     }
+    // 3) 메시지 로컬에 표시 및 스트리밍 시작
+    onSend(messageObj);
     startStream(messageObj, convId);
   };
 

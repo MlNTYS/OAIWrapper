@@ -18,6 +18,7 @@ export default function AdminModelsPage() {
   const [newInferenceModel, setNewInferenceModel] = useState(false);
   const [newReasoningEffort, setNewReasoningEffort] = useState('medium');
   const [newSystemMessage, setNewSystemMessage] = useState('');
+  const [newDisplayOrder, setNewDisplayOrder] = useState(0);
   const [systemEdits, setSystemEdits] = useState({});
   const queryClient = useQueryClient();
   const { data: models = [], isLoading } = useQuery(
@@ -51,6 +52,7 @@ export default function AdminModelsPage() {
   const [editInferenceModel, setEditInferenceModel] = useState(false);
   const [editReasoningEffort, setEditReasoningEffort] = useState('medium');
   const [editSystemMessage, setEditSystemMessage] = useState('');
+  const [editDisplayOrder, setEditDisplayOrder] = useState(0);
   const openEdit = (model) => {
     setEditingModel(model);
     setEditApiName(model.api_name);
@@ -60,6 +62,7 @@ export default function AdminModelsPage() {
     setEditInferenceModel(model.is_inference_model);
     setEditReasoningEffort(model.reasoning_effort ?? 'medium');
     setEditSystemMessage(model.system_message ?? '');
+    setEditDisplayOrder(model.display_order ?? 0);
     setEditOpened(true);
   };
 
@@ -74,6 +77,7 @@ export default function AdminModelsPage() {
           <TextInput label="API Name" value={newApiName} onChange={(e) => setNewApiName(e.currentTarget.value)} required />
           <TextInput label="Name" mt="md" value={newName} onChange={(e) => setNewName(e.currentTarget.value)} required />
           <NumberInput label="Cost" mt="md" min={0} value={newCost} onChange={setNewCost} />
+          <NumberInput label="순서" mt="md" min={0} value={newDisplayOrder} onChange={setNewDisplayOrder} />
           <Group mt="md" align="center">
             <Switch label="Enabled" checked={newEnabled} onChange={(e) => setNewEnabled(e.currentTarget.checked)} />
             <Switch label="Inference Model" ml="xl" checked={newInferenceModel} onChange={(e) => setNewInferenceModel(e.currentTarget.checked)} />
@@ -103,7 +107,7 @@ export default function AdminModelsPage() {
             fullWidth
             mt="md"
             onClick={() => {
-              const data = { api_name: newApiName, name: newName, cost: newCost, is_enabled: newEnabled, is_inference_model: newInferenceModel };
+              const data = { api_name: newApiName, name: newName, cost: newCost, is_enabled: newEnabled, is_inference_model: newInferenceModel, display_order: newDisplayOrder };
               if (newInferenceModel) data.reasoning_effort = newReasoningEffort;
               if (newSystemMessage) data.system_message = newSystemMessage;
               createModel.mutate(data);
@@ -115,6 +119,7 @@ export default function AdminModelsPage() {
           <TextInput label="API Name" value={editApiName} onChange={(e) => setEditApiName(e.currentTarget.value)} required />
           <TextInput label="Name" mt="md" value={editName} onChange={(e) => setEditName(e.currentTarget.value)} required />
           <NumberInput label="Cost" mt="md" min={0} value={editCost} onChange={setEditCost} />
+          <NumberInput label="순서" mt="md" min={0} value={editDisplayOrder} onChange={setEditDisplayOrder} />
           <Group mt="md" align="center">
             <Switch label="Enabled" checked={editEnabled} onChange={(e) => setEditEnabled(e.currentTarget.checked)} />
             <Switch label="Inference Model" ml="xl" checked={editInferenceModel} onChange={(e) => setEditInferenceModel(e.currentTarget.checked)} />
@@ -122,7 +127,11 @@ export default function AdminModelsPage() {
           <Select
             label="Reasoning Effort"
             mt="md"
-            data={[{ value: 'low', label: 'low' }, { value: 'medium', label: 'medium' }, { value: 'high', label: 'high' }]}
+            data={[
+              { value: 'low', label: 'low' },
+              { value: 'medium', label: 'medium' },
+              { value: 'high', label: 'high' },
+            ]}
             value={editReasoningEffort || 'medium'}
             onChange={(value) => setEditReasoningEffort(value || 'medium')}
             disabled={!editInferenceModel}
@@ -148,6 +157,7 @@ export default function AdminModelsPage() {
                 is_inference_model: editInferenceModel,
                 reasoning_effort: editReasoningEffort,
                 system_message: editSystemMessage,
+                display_order: editDisplayOrder,
               };
               updateModel.mutate(data, { onSuccess: () => setEditOpened(false) });
             }}
@@ -163,6 +173,7 @@ export default function AdminModelsPage() {
                 <th>ID</th>
                 <th>이름</th>
                 <th>API 이름</th>
+                <th>순서</th>
                 <th>활성화</th>
                 <th>비용</th>
                 <th>추론 모델</th>
@@ -177,6 +188,7 @@ export default function AdminModelsPage() {
                   <td>{m.id}</td>
                   <td>{m.name}</td>
                   <td>{m.api_name}</td>
+                  <td>{m.display_order}</td>
                   <td>
                     <InlineSwitch
                       checked={enabledEdits[m.id] ?? m.is_enabled}
