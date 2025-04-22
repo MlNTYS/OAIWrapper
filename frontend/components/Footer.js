@@ -152,11 +152,10 @@ export default function Footer({ conversationId, onSend, onReceive, onNewConvers
   
   useEffect(() => { localConvIdRef.current = conversationId; }, [conversationId]);
   useEffect(() => {
-    const convId = conversationId;
-    const message = lastUserMessageRef.current;
-    if (convId && message) {
-      startStream(message, convId);
-    }
+    controllerRef.current?.abort();
+    setIsStreaming(false);
+    setShowRetry(false);
+    lastUserMessageRef.current = null;
   }, [conversationId]);
   
   // 메시지 전송 및 스트리밍 처리 함수
@@ -232,6 +231,7 @@ export default function Footer({ conversationId, onSend, onReceive, onNewConvers
         localConvIdRef.current = convId;
         onNewConversation(convId);
         queryClient.invalidateQueries(['conversations']);
+        startStream(messageObj, convId);
       } catch (err) {
         console.error('Conversation 생성 실패', err);
         setShowRetry(true);
@@ -263,9 +263,9 @@ export default function Footer({ conversationId, onSend, onReceive, onNewConvers
   return (
     <Box className={classes.footer}>
       <Box className={classes.footerContent}>
-        <Flex justify="flex-end" align="center" mb="xs">
+        <Box mb="xs">
           <ModelSelect />
-        </Flex>
+        </Box>
         <Group position="apart" spacing="sm" align="flex-end">
           <Textarea
             placeholder="메시지를 입력하세요..."

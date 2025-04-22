@@ -42,12 +42,22 @@ model Session {
   @@map("sessions")
 }
 
+// Add enum for reasoning effort levels
+enum ReasoningEffort {
+  low
+  medium
+  high
+}
+
 model Model {
   id         String     @id @default(uuid()) @db.Uuid
   api_name   String     @unique
   name       String
   cost       Int
   is_enabled Boolean    @default(true)
+  is_inference_model Boolean @default(false) @map("is_inference_model")
+  reasoning_effort     ReasoningEffort? @map("reasoning_effort")
+  system_message       String?             @map("system_message")
   usageLogs  UsageLog[]
 
   @@map("models")

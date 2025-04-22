@@ -21,7 +21,7 @@ export default function ModelSelect() {
 
   const dataOptions = models.map((m) => ({
     value: m.id.toString(),
-    label: m.name,
+    label: `${m.name} (${m.cost ? m.cost + ' 토큰' : '가격 정보 없음'})`,
   }));
 
   return (

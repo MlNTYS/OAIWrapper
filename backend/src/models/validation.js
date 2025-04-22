@@ -8,6 +8,7 @@ const createModelRules = [
   check('is_enabled').optional().isBoolean().withMessage('is_enabled must be boolean'),
   check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
   check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
+  check('system_message').optional().isString().withMessage('system_message must be a string'),
 ];
 
 const updateModelRules = [
@@ -18,6 +19,7 @@ const updateModelRules = [
   check('is_enabled').optional().isBoolean().withMessage('is_enabled must be boolean'),
   check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
   check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
+  check('system_message').optional().isString().withMessage('system_message must be a string'),
 ];
 
 const idParamRule = [

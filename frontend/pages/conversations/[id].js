@@ -20,13 +20,17 @@ export default function ConversationPage() {
     { enabled: !!id && !isNew }
   );
 
+  // conversationId가 변경되면 이전 메시지 초기화
+  useEffect(() => {
+    setMessages([]);
+  }, [id]);
+
+  // 서버 데이터 로드 시 메시지 및 타이틀 설정
   useEffect(() => {
     if (isNew) {
-      setMessages([]);
       setTitle('새 대화');
     } else if (conv && conv.messages) {
       setTitle(conv.title);
-      // 서버에서 가져온 메시지로 초기화
       setMessages(conv.messages);
     }
   }, [conv, isNew]);
@@ -69,13 +73,9 @@ export default function ConversationPage() {
       flexDirection: 'column',
       // 페이지 스크롤 사용
     })}>
-      {/* 헤더 */}
-      <Box mt="md" mb="md" sx={{ width: '100%', maxWidth: 800, margin: '0 auto' }}>
-        <Title order={1} sx={{ fontWeight: 800, fontSize: 28, letterSpacing: -1, marginBottom: 4 }}>{title}</Title>
-        <Divider my={0} color="dark.5" sx={{ opacity: 0.4 }} />
-      </Box>
       {/* 메시지 리스트 */}
       <Box sx={(theme) => ({
+        flex: 1,
         padding: theme.spacing.md,
         paddingBottom: 140, // footer 높이 공간 확보 (내부 패딩)
         width: '100%',
@@ -84,12 +84,14 @@ export default function ConversationPage() {
         display: 'flex',
         flexDirection: 'column',
       })}>
-        {isNew && <Text align="center" size="lg" mb="xl">안녕하세요! 어떤 질문이 있으신가요?</Text>}
         {isLoading && !isNew && <Text align="center">로딩 중...</Text>}
-        {!isNew && !isLoading && messages.length === 0 && (
-          <Text align="center" size="lg" mb="xl">안녕하세요! 어떤 질문이 있으신가요?</Text>
+        {(isNew || (!isNew && !isLoading && messages.length === 0)) && (
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <Text align="center" size="lg">안녕하세요! 어떤 질문이 있으신가요?</Text>
+          </Box>
         )}
-        {messages.map((msg, idx) => (
+        {/* isLoading 중에는 메시지 매핑 건너뜀 */}
+        {!isLoading && messages.map((msg, idx) => (
           <MessageCard key={idx} content={msg.content} isUser={msg.role === 'user'} />
         ))}
       </Box>

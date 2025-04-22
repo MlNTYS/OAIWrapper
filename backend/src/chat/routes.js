@@ -73,7 +73,7 @@ router.post(
             {
               model: 'gpt-4.1-nano-2025-04-14',
               messages: [
-                { role: 'system', content: 'Generate a short title for this conversation. Do not answer it directly, just generate the title. Write it in language of the conversation.' },
+                { role: 'system', content: 'Generate a short title for given user conversation. Do not answer it directly, just generate the title. Write it in language of the conversation.' },
                 { role: 'user', content: titlePrompt }
               ],
               max_tokens: 10
@@ -133,8 +133,13 @@ router.post(
     });
 
     try {
+      // Prepare messages with optional system_message
+      let callMessages = messages;
+      if (modelInfo.system_message) {
+        callMessages = [{ role: 'system', content: modelInfo.system_message }, ...messages];
+      }
       // Prepare payload and include reasoning_effort if inference model
-      const payload = { model, messages, stream: true };
+      const payload = { model, messages: callMessages, stream: true };
       if (modelInfo.is_inference_model) {
         payload.reasoning_effort = modelInfo.reasoning_effort;
       }
