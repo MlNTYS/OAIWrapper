@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev -p $FRONTEND_PORT",
     "build": "next build",
-    "start": "next start -p $FRONTEND_PORT"
+    "start": "next start -p $FRONTEND_PORT",
+    "install:clean": "rm -rf node_modules && npm install"
   },
   "private": true,
   "dependencies": {
@@ -19,6 +20,7 @@
     "@tanstack/react-query": "^4.29.0",
     "@tanstack/react-query-devtools": "^4.29.0",
     "axios": "^1.4.0",
+    "highlight.js": "^10.7.3",
     "katex": "^0.16.22",
     "next": "^15.3.1",
     "react": "^18.2.0",
@@ -26,6 +28,10 @@
     "react-katex": "^3.0.1",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.1",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
+    "remark-math": "^6.0.0",
     "zustand": "^4.4.0"
   },
   "devDependencies": {
