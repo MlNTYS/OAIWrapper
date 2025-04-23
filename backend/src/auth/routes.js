@@ -25,7 +25,7 @@ router.post('/login', async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     maxAge: parseExpiresIn(process.env.REFRESH_TOKEN_EXPIRES_IN),
-    sameSite: 'strict',
+    sameSite: 'none',
     path: '/api/auth/refresh',
   });
   return res.json({ accessToken });
@@ -35,7 +35,7 @@ router.post('/login', async (req, res) => {
 router.post('/logout', async (req, res) => {
   const token = req.cookies.refreshToken;
   if (token) await prisma.session.deleteMany({ where: { refresh_token: token } });
-  res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+  res.clearCookie('refreshToken', { path: '/api/auth/refresh', sameSite: 'none', secure: process.env.NODE_ENV === 'production' });
   return res.sendStatus(204);
 });
 

@@ -9,6 +9,7 @@ const createModelRules = [
   check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
   check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
   check('system_message').optional().isString().withMessage('system_message must be a string'),
+  check('context_limit').optional().isInt({ min: 1 }).withMessage('context_limit는 양의 정수여야 합니다'),
 ];
 
 const updateModelRules = [
@@ -20,6 +21,7 @@ const updateModelRules = [
   check('is_inference_model').optional().isBoolean().withMessage('is_inference_model must be boolean'),
   check('reasoning_effort').optional().isIn(['low','medium','high']).withMessage('reasoning_effort must be one of low, medium, high'),
   check('system_message').optional().isString().withMessage('system_message must be a string'),
+  check('context_limit').optional().isInt({ min: 1 }).withMessage('context_limit는 양의 정수여야 합니다'),
 ];
 
 const idParamRule = [

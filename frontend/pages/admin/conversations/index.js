@@ -34,6 +34,7 @@ export default function AdminConversationsPage() {
               <tr>
                 <th>ID</th>
                 <th>제목</th>
+                <th>토큰 사용량</th>
                 <th>마지막 업데이트</th>
                 <th>Actions</th>
               </tr>
@@ -43,6 +44,7 @@ export default function AdminConversationsPage() {
                 <tr key={c.id}>
                   <td>{c.id}</td>
                   <td>{c.title}</td>
+                  <td>{c.total_tokens}</td>
                   <td>{new Date(c.updated_at).toLocaleString()}</td>
                   <td>
                     <Group spacing="xs">

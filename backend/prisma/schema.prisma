@@ -59,6 +59,7 @@ model Model {
   reasoning_effort     ReasoningEffort? @map("reasoning_effort")
   system_message       String?             @map("system_message")
   display_order        Int                 @default(0)
+  context_limit       Int                 @default(4096)
   usageLogs  UsageLog[]
 
   @@map("models")
@@ -97,6 +98,7 @@ model Conversation {
   created_at DateTime    @default(now())
   updated_at DateTime    @updatedAt
   messages   Message[]
+  total_tokens Int @default(0)
   user       User        @relation(fields: [user_id], references: [id])
 
   @@map("conversations")
@@ -107,6 +109,7 @@ model Message {
   conversation_id String       @db.Uuid
   role            String
   content         String
+  token_count     Int @default(0)
   created_at      DateTime     @default(now())
   conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
 

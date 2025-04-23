@@ -7,6 +7,7 @@ import api from '../utils/api';
 import ModelSelect from './ModelSelect';
 import useModelStore from '../store/useModelStore';
 import { useRouter } from 'next/router';
+import { showNotification } from '@mantine/notifications';
 
 const SIDEBAR_WIDTH = 256;          // 사이드바 실제 너비(px)
 
@@ -147,6 +148,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
+  const [limitExceeded, setLimitExceeded] = useState(false);
   const lastUserMessageRef = useRef(null);
   const controllerRef = useRef(null);
   const localConvIdRef = useRef(conversationId);
@@ -157,6 +159,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
     controllerRef.current?.abort();
     setIsStreaming(false);
     setShowRetry(false);
+    setLimitExceeded(false);
     lastUserMessageRef.current = null;
   }, [conversationId]);
   
@@ -165,6 +168,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
     queryClient.invalidateQueries(['conversations']);
     setIsStreaming(true);
     setShowRetry(false);
+    setLimitExceeded(false);
     controllerRef.current = new AbortController();
     if (onTitle && convId) {
       api.get(`/conversations/${convId}`)
@@ -173,14 +177,18 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
     }
     try {
       const accessToken = localStorage.getItem('accessToken');
+      // CSRF 토큰 읽기
+      const xsrfToken = document.cookie.split('; ').find(c => c.trim().startsWith('XSRF-TOKEN='))?.split('=')[1];
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+      };
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/chat/stream`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
+          headers,
           credentials: 'include',
           body: JSON.stringify({ model: selectedModel?.api_name, messages: [message], conversationId: convId }),
           signal: controllerRef.current.signal,
@@ -197,16 +205,33 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
         buffer += decoder.decode(value);
         const parts = buffer.split('\n\n');
         for (let i = 0; i < parts.length - 1; i++) {
-          const part = parts[i].replace(/^data: ?/, '').trim();
+          const raw = parts[i];
           buffer = parts.slice(i + 1).join('\n\n');
-          if (part === '[DONE]') continue;
-          try {
-            const data = JSON.parse(part);
-            if (data.content !== undefined) {
-              onReceive({ role: 'assistant', content: data.content });
+          const lines = raw.split('\n');
+          let eventType = 'message';
+          let dataLine = null;
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.replace('event: ', '').trim();
+            } else if (line.startsWith('data:')) {
+              dataLine = line.replace(/^data:\s*/, '');
             }
-          } catch {
-            // ignore
+          }
+          if (!dataLine) continue;
+          if (dataLine === '[DONE]' && eventType === 'message') continue;
+          try {
+            const data = JSON.parse(dataLine);
+            if (eventType === 'message' && data.content !== undefined) {
+              onReceive({ role: 'assistant', content: data.content });
+            } else if (eventType === 'warning' && data.warning) {
+              showNotification({ title: '경고', message: data.warning, color: 'yellow', position: 'top-right' });
+            } else if (eventType === 'error' && data.error) {
+              onReceive({ role: 'assistant', content: data.error });
+              setLimitExceeded(true);
+              controllerRef.current?.abort();
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data', e);
           }
         }
       }
@@ -220,7 +245,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
 
   // 최초 메시지 전송 핸들러 (첫번째 방식)
   const handleSubmit = async () => {
-    if (!input.trim() || isStreaming || !selectedModel?.api_name) return;
+    if (!input.trim() || isStreaming || !selectedModel?.api_name || limitExceeded) return;
     const messageObj = { role: 'user', content: input };
     // 입력 초기화 및 lastUserMessage 저장
     setInput('');
@@ -286,7 +311,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
                 handleSubmit();
               }
             }}
-            disabled={isStreaming}
+            disabled={isStreaming || limitExceeded}
             sx={(theme) => ({
               '& textarea': {
                 backgroundColor: theme.colors.dark[7],
@@ -309,7 +334,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
               재시도
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={!selectedModel?.api_name} color="royal-blue" sx={{ backgroundColor: theme.colors['royal-blue'][7], transition: 'background-color 200ms ease', '&:hover': { backgroundColor: theme.colors['royal-blue'][6] }, '&:disabled': { backgroundColor: theme.colors.dark[6], color: theme.colors.dark[3], opacity: 0.6 } }}>
+            <Button onClick={handleSubmit} disabled={!selectedModel?.api_name || limitExceeded} color="royal-blue" sx={{ backgroundColor: theme.colors['royal-blue'][7], transition: 'background-color 200ms ease', '&:hover': { backgroundColor: theme.colors['royal-blue'][6] }, '&:disabled': { backgroundColor: theme.colors.dark[6], color: theme.colors.dark[3], opacity: 0.6 } }}>
               전송
             </Button>
           )}

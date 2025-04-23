@@ -7,13 +7,13 @@ async function getConversations(req, res, next) {
     let conversations;
     if (userRole === 'ADMIN') {
       conversations = await prisma.conversation.findMany({
-        select: { id: true, title: true, updated_at: true },
+        select: { id: true, title: true, updated_at: true, total_tokens: true },
         orderBy: { updated_at: 'desc' },
       });
     } else {
       conversations = await prisma.conversation.findMany({
         where: { user_id: userId },
-        select: { id: true, title: true, updated_at: true },
+        select: { id: true, title: true, updated_at: true, total_tokens: true },
         orderBy: { updated_at: 'desc' },
       });
     }

@@ -3,7 +3,9 @@ import useUIStore from '../store/useUIStore';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
-  withCredentials: true, // RefreshToken 쿠키 자동 전송
+  withCredentials: true, // RefreshToken & CSRF cookie 자동 전송
+  xsrfCookieName: 'XSRF-TOKEN', // 쿠키에 저장된 CSRF 토큰 이름
+  xsrfHeaderName: 'X-XSRF-TOKEN' // 요청 헤더에 실어보낼 이름
 });
 
 // Request interceptor: set loading and attach token

@@ -6,6 +6,17 @@ const axios = require('axios');
 const prisma = require('../prisma');
 const authMiddleware = require('../auth/middleware');
 const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
+const { encoding_for_model, get_encoding } = require("tiktoken");
+const encoderCache = {};
+function getEncoder(model) {
+  if (encoderCache[model]) return encoderCache[model];
+  try {
+    encoderCache[model] = encoding_for_model(model);
+  } catch {
+    encoderCache[model] = get_encoding('cl100k_base');
+  }
+  return encoderCache[model];
+}
 
 const router = express.Router();
 
@@ -28,12 +39,25 @@ router.post(
     check('conversationId').optional().isUUID().withMessage('conversationId must be UUID'),
   ]),
   async (req, res) => {
+    // SSE headers for event-stream (must be set before any writes)
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    // predeclare SSE heartbeat for error handling
+    let heartbeat;
     const userId = req.userId;
     const { model, messages, conversationId } = req.body;
 
+    // 모델 정보 조회 및 사용 가능 여부 확인
+    const modelInfo = await prisma.model.findUnique({ where: { api_name: model } });
+    if (!modelInfo || !modelInfo.is_enabled) {
+      return res.status(400).json({ error: '모델을 사용할 수 없습니다.' });
+    }
+
     // 입력 검증
     if (!model || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Invalid request body' });
+      return res.status(400).json({ error: '잘못된 요청입니다.' });
     }
 
     let convId = conversationId;
@@ -87,36 +111,42 @@ router.post(
         }
       }
     }
-    // 유저 메시지 저장
+    // User message saving with token count
     const lastUser = Array.isArray(messages) && [...messages].reverse().find(m => m.role === 'user');
     if (lastUser) {
-      await prisma.message.create({ data: { conversation_id: convId, role: 'user', content: lastUser.content } });
-    }
-
-    // 모델 조회 및 사용 가능 여부 확인 (api_name 기반 조회)
-    const modelInfo = await prisma.model.findUnique({ where: { api_name: model } });
-    if (!modelInfo || !modelInfo.is_enabled) {
-      return res.status(400).json({ error: 'Model not available' });
+      const encoding = getEncoder(model);
+      const userTokenCount = encoding.encode(lastUser.content).length;
+      // Enforce per-model context limit
+      const convMeta = await prisma.conversation.findUnique({ where: { id: convId }, select: { total_tokens: true } });
+      const newTotalTokens = convMeta.total_tokens + userTokenCount;
+      if (newTotalTokens > modelInfo.context_limit) {
+        // abort if context limit exceeded
+        res.write(`event: error\ndata: ${JSON.stringify({ error: '대화 한도를 초과했습니다.' })}\n\n`);
+        clearInterval(heartbeat);
+        res.end();
+        return;
+      } else if (newTotalTokens >= Math.floor(modelInfo.context_limit * 0.80)) {
+        // warning when nearing limit
+        res.write(`event: warning\ndata: ${JSON.stringify({ warning: '대화 한도에 거의 도달했습니다.', percent: Math.round(newTotalTokens / modelInfo.context_limit * 100) })}\n\n`);
+      }
+      await prisma.$transaction([
+        prisma.message.create({ data: { conversation_id: convId, role: 'user', content: lastUser.content, token_count: userTokenCount } }),
+        prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: userTokenCount } } })
+      ]);
     }
 
     // 크레딧 확인
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (user.current_credit < modelInfo.cost) {
-      return res.status(403).json({ error: 'Insufficient credit' });
+      return res.status(403).json({ error: '크레딧이 부족합니다.' });
     }
 
     // 크레딧 즉시 차감 및 ledger 기록
     await prisma.user.update({ where: { id: userId }, data: { current_credit: user.current_credit - modelInfo.cost } });
     await prisma.creditLedger.create({ data: { user_id: userId, delta: -modelInfo.cost, reason: 'usage' } });
 
-    // SSE 헤더 설정
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
-
     // heartbeat to keep connection alive
-    const heartbeat = setInterval(() => {
+    heartbeat = setInterval(() => {
       res.write(': heartbeat\n\n');
     }, 20000);
 
@@ -133,12 +163,16 @@ router.post(
     });
 
     try {
-      // Prepare messages with optional system_message
-      let callMessages = messages;
+      // Load full conversation for context-aware
+      const dbMessages = await prisma.message.findMany({
+        where: { conversation_id: convId },
+        orderBy: { created_at: 'asc' }
+      });
+      let callMessages = dbMessages.map(m => ({ role: m.role, content: m.content }));
       if (modelInfo.system_message) {
-        callMessages = [{ role: 'system', content: modelInfo.system_message }, ...messages];
+        callMessages.unshift({ role: 'system', content: modelInfo.system_message });
       }
-      // Prepare payload and include reasoning_effort if inference model
+
       const payload = { model, messages: callMessages, stream: true };
       if (modelInfo.is_inference_model) {
         payload.reasoning_effort = modelInfo.reasoning_effort;
@@ -181,10 +215,30 @@ router.post(
       });
 
       openaiRes.data.on('end', async () => {
-        // assistant 메시지 저장
-        await prisma.message.create({ data: { conversation_id: convId, role: 'assistant', content: assistantContent } });
-        // 사용 기록 생성 (modelInfo.id 사용)
-        await prisma.usageLog.create({ data: { user_id: userId, model_id: modelInfo.id, prompt_tokens: 0, completion_tokens: 0, cost: modelInfo.cost } });
+        // Assistant message saving with token count
+        const encoding = getEncoder(model);
+        const assistantTokenCount = encoding.encode(assistantContent).length;
+        await prisma.$transaction([
+          prisma.message.create({ data: { conversation_id: convId, role: 'assistant', content: assistantContent, token_count: assistantTokenCount } }),
+          prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: assistantTokenCount } } })
+        ]);
+        // Calculate prompt tokens (sum of user message tokens)
+        const promptAgg = await prisma.message.aggregate({
+          where: { conversation_id: convId, role: 'user' },
+          _sum: { token_count: true }
+        });
+        const promptTokens = promptAgg._sum.token_count || 0;
+        const completionTokens = assistantTokenCount;
+        // Create usage log with actual token counts
+        await prisma.usageLog.create({
+          data: {
+            user_id: userId,
+            model_id: modelInfo.id,
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            cost: modelInfo.cost
+          }
+        });
       });
     } catch (err) {
       // 클라이언트 취소 에러: 추가 처리 없이 종료
@@ -194,10 +248,10 @@ router.post(
       // 오류 발생 시 환불 및 ledger 기록
       await prisma.user.update({ where: { id: userId }, data: { current_credit: user.current_credit + modelInfo.cost } });
       await prisma.creditLedger.create({ data: { user_id: userId, delta: modelInfo.cost, reason: 'refund' } });
-      res.write(`event: error\ndata: ${JSON.stringify({ error: 'OpenAI API error' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: 'OpenAI API 오류가 발생했습니다.' })}\n\n`);
       res.end();
     }
   }
 );
 
-module.exports = router; 
+module.exports = router;

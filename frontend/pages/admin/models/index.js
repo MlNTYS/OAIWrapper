@@ -19,6 +19,7 @@ export default function AdminModelsPage() {
   const [newReasoningEffort, setNewReasoningEffort] = useState('medium');
   const [newSystemMessage, setNewSystemMessage] = useState('');
   const [newDisplayOrder, setNewDisplayOrder] = useState(0);
+  const [newContextLimit, setNewContextLimit] = useState(4096);
   const [systemEdits, setSystemEdits] = useState({});
   const queryClient = useQueryClient();
   const { data: models = [], isLoading } = useQuery(
@@ -53,6 +54,7 @@ export default function AdminModelsPage() {
   const [editReasoningEffort, setEditReasoningEffort] = useState('medium');
   const [editSystemMessage, setEditSystemMessage] = useState('');
   const [editDisplayOrder, setEditDisplayOrder] = useState(0);
+  const [editContextLimit, setEditContextLimit] = useState(0);
   const openEdit = (model) => {
     setEditingModel(model);
     setEditApiName(model.api_name);
@@ -63,6 +65,7 @@ export default function AdminModelsPage() {
     setEditReasoningEffort(model.reasoning_effort ?? 'medium');
     setEditSystemMessage(model.system_message ?? '');
     setEditDisplayOrder(model.display_order ?? 0);
+    setEditContextLimit(model.context_limit ?? 0);
     setEditOpened(true);
   };
 
@@ -103,11 +106,12 @@ export default function AdminModelsPage() {
             onChange={(e) => setNewSystemMessage(e.currentTarget.value)}
             disabled={!newInferenceModel}
           />
+          <NumberInput label="토큰 한도" mt="md" min={1} value={newContextLimit} onChange={setNewContextLimit} />
           <Button
             fullWidth
             mt="md"
             onClick={() => {
-              const data = { api_name: newApiName, name: newName, cost: newCost, is_enabled: newEnabled, is_inference_model: newInferenceModel, display_order: newDisplayOrder };
+              const data = { api_name: newApiName, name: newName, cost: newCost, is_enabled: newEnabled, is_inference_model: newInferenceModel, display_order: newDisplayOrder, context_limit: newContextLimit };
               if (newInferenceModel) data.reasoning_effort = newReasoningEffort;
               if (newSystemMessage) data.system_message = newSystemMessage;
               createModel.mutate(data);
@@ -144,6 +148,7 @@ export default function AdminModelsPage() {
             value={editSystemMessage}
             onChange={(e) => setEditSystemMessage(e.currentTarget.value)}
           />
+          <NumberInput label="토큰 한도" mt="md" min={1} value={editContextLimit} onChange={setEditContextLimit} />
           <Button
             fullWidth
             mt="md"
@@ -158,6 +163,7 @@ export default function AdminModelsPage() {
                 reasoning_effort: editReasoningEffort,
                 system_message: editSystemMessage,
                 display_order: editDisplayOrder,
+                context_limit: editContextLimit,
               };
               updateModel.mutate(data, { onSuccess: () => setEditOpened(false) });
             }}
@@ -179,6 +185,7 @@ export default function AdminModelsPage() {
                 <th>추론 모델</th>
                 <th>추론 노력</th>
                 <th>System Message</th>
+                <th>최대 토큰</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -230,6 +237,7 @@ export default function AdminModelsPage() {
                       style={{ width: 200 }}
                     />
                   </td>
+                  <td>{m.context_limit}</td>
                   <td>
                     <Group spacing="xs">
                       <Button size="sm" onClick={() => openEdit(m)} loading={updateModel.isLoading}>수정</Button>
@@ -251,4 +259,4 @@ export default function AdminModelsPage() {
       </Container>
     </AdminLayout>
   );
-} 
+}
