@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../utils/api';
 import useModelStore from '../store/useModelStore';
 
-export default function ModelSelect() {
+export default function ModelSelect({ lastModelId }) {
   const { data: models = [] } = useQuery(
     ['models'],
     () => api.get('/models').then((res) => res.data),
@@ -14,10 +14,32 @@ export default function ModelSelect() {
   const setSelected = useModelStore((state) => state.setSelectedModel);
 
   useEffect(() => {
-    if (!selected && models.length > 0) {
-      setSelected(models[0]);
+    if (models.length > 0) {
+      if (lastModelId) {
+        // If a lastModelId is provided, try to find and select that model
+        const lastModel = models.find(m => m.id === lastModelId);
+        if (lastModel) {
+          setSelected(lastModel);
+          return;
+        }
+      }
+      
+      // If no lastModelId or model not found, use the first model
+      if (!selected) {
+        setSelected(models[0]);
+      }
     }
-  }, [models]);
+  }, [models, lastModelId]);
+  
+  // This separate effect ensures model is updated when conversation changes
+  useEffect(() => {
+    if (lastModelId && models.length > 0) {
+      const lastModel = models.find(m => m.id === lastModelId);
+      if (lastModel) {
+        setSelected(lastModel);
+      }
+    }
+  }, [lastModelId]);
 
   const dataOptions = models.map((m) => ({
     value: m.id.toString(),

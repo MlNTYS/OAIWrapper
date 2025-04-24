@@ -139,7 +139,7 @@ const useStyles = createStyles((theme, { offsetLeft }) => ({
   }
 }));
 
-export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
+export default function Footer({ conversationId, onSend, onReceive, onTitle, lastModelId }) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const { classes } = useStyles({ offsetLeft: isDesktop ? SIDEBAR_WIDTH : 0 });
   const theme = useMantineTheme();
@@ -294,7 +294,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle }) {
     <Box className={classes.footer}>
       <Box className={classes.footerContent}>
         <Box mb="xs">
-          <ModelSelect />
+          <ModelSelect lastModelId={lastModelId} />
         </Box>
         <Group position="apart" spacing="sm" align="flex-end">
           <Textarea

@@ -63,7 +63,7 @@ router.post(
     let convId = conversationId;
     // Conversation 생성/확인
     if (!convId) {
-      const conv = await prisma.conversation.create({ data: { user_id: userId } });
+      const conv = await prisma.conversation.create({ data: { user_id: userId, last_model_id: modelInfo.id } });
       convId = conv.id;
       // 자동 제목 생성
       try {
@@ -131,7 +131,7 @@ router.post(
       }
       await prisma.$transaction([
         prisma.message.create({ data: { conversation_id: convId, role: 'user', content: lastUser.content, token_count: userTokenCount } }),
-        prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: userTokenCount } } })
+        prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: userTokenCount }, last_model_id: modelInfo.id } })
       ]);
     }
 
@@ -220,7 +220,7 @@ router.post(
         const assistantTokenCount = encoding.encode(assistantContent).length;
         await prisma.$transaction([
           prisma.message.create({ data: { conversation_id: convId, role: 'assistant', content: assistantContent, token_count: assistantTokenCount } }),
-          prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: assistantTokenCount } } })
+          prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: assistantTokenCount }, last_model_id: modelInfo.id } })
         ]);
         // Calculate prompt tokens (sum of user message tokens)
         const promptAgg = await prisma.message.aggregate({

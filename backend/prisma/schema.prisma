@@ -61,6 +61,7 @@ model Model {
   display_order        Int                 @default(0)
   context_limit       Int                 @default(4096)
   usageLogs  UsageLog[]
+  conversations Conversation[]
 
   @@map("models")
 }
@@ -99,7 +100,9 @@ model Conversation {
   updated_at DateTime    @updatedAt
   messages   Message[]
   total_tokens Int @default(0)
+  last_model_id String?    @db.Uuid
   user       User        @relation(fields: [user_id], references: [id])
+  last_model  Model?     @relation(fields: [last_model_id], references: [id])
 
   @@map("conversations")
 }

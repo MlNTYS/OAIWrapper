@@ -2,7 +2,7 @@ const express = require('express');
 const validate = require('../middlewares/validate');
 const { idParamRule } = require('./validation');
 const authMiddleware = require('../auth/middleware');
-const { getConversations, getConversation, deleteConversation, createConversation } = require('./controller');
+const { getConversations, getConversation, deleteConversation, createConversation, updateConversationTitle } = require('./controller');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
@@ -18,5 +18,8 @@ router.get('/:id', authMiddleware, validate(idParamRule), getConversation);
 
 // 대화 삭제 (ADMIN or 본인)
 router.delete('/:id', authMiddleware, validate(idParamRule), deleteConversation);
+
+// 대화 제목 수정 (ADMIN or 본인)
+router.patch('/:id', authMiddleware, validate(idParamRule), updateConversationTitle);
 
 module.exports = router; 

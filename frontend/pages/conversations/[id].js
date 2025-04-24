@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../utils/api';
 import Footer from '../../components/Footer';
 import MessageCard from '../../components/MessageCard';
+import useModelStore from '../../store/useModelStore';
 
 export default function ConversationPage() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function ConversationPage() {
 
   const [messages, setMessages] = useState([]);
   const [title, setTitle] = useState('새 대화');
+  const [lastModelId, setLastModelId] = useState(null);
+  const setSelectedModel = useModelStore(state => state.setSelectedModel);
 
   const { data: conv, isLoading } = useQuery(
     ['conversation', id],
@@ -35,10 +38,18 @@ export default function ConversationPage() {
   useEffect(() => {
     if (isNew) {
       setTitle('새 대화');
+      setLastModelId(null);
+      // Reset model for new conversation if needed
+      // Optionally, uncomment to reset global model: setSelectedModel(null);
     } else if (conv && conv.messages) {
       setTitle(conv.title);
       // 로컬 메시지가 없을 때만 서버 메시지로 초기화
       setMessages((prev) => prev.length === 0 ? conv.messages : prev);
+      // 저장된 마지막 모델 ID 설정
+      if (conv.last_model) {
+        setLastModelId(conv.last_model.id);
+        setSelectedModel(conv.last_model);
+      }
     }
   }, [conv, isNew]);
 
@@ -107,6 +118,7 @@ export default function ConversationPage() {
         onSend={handleSend}
         onReceive={handleReceive}
         onTitle={handleTitle}
+        lastModelId={lastModelId}
       />
     </Box>
   );

@@ -3,7 +3,7 @@ import {
   Navbar, ScrollArea, Button, NavLink, Text, 
   useMantineTheme, Menu, UnstyledButton, 
   Group, Avatar, createStyles, 
-  Tooltip, Divider, Box, ActionIcon
+  Tooltip, Divider, Box, ActionIcon, Loader
 } from '@mantine/core';
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +11,8 @@ import {
   IconPlus, IconMessage, IconChevronRight, 
   IconSettings, IconLogout, IconCoin
 } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconCheck, IconX } from '@tabler/icons-react';
+import ConversationEditModal from './ConversationEditModal';
 import api from '../utils/api';
 import useConversationStore from '../store/useConversationStore';
 import useAuthStore from '../store/useAuthStore';
@@ -103,13 +105,16 @@ const useStyles = createStyles((theme) => ({
 
 export default function Sidebar() {
   const router = useRouter();
-  const { conversations, setConversations } = useConversationStore();
+  const { conversations, setConversations, removeConversation } = useConversationStore();
   const theme = useMantineTheme();
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
   const [credit, setCredit] = useState(0);
   const { classes } = useStyles();
+  const [editModalOpened, setEditModalOpened] = useState(false);
+  const [selectedConv, setSelectedConv] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const { data, isLoading } = useQuery(
     ['conversations'],
@@ -117,7 +122,6 @@ export default function Sidebar() {
     { staleTime: 1000 * 60 }
   );
 
-  // 사용자 크레딧 정보 로드
   const { data: userData, refetch: refetchUserData } = useQuery(
     ['user-credit'],
     () => api.get('/auth/me').then((res) => res.data),
@@ -130,7 +134,6 @@ export default function Sidebar() {
     }
   );
 
-  // 10초마다 크레딧 정보 갱신
   useEffect(() => {
     const intervalId = setInterval(() => {
       refetchUserData();
@@ -264,11 +267,69 @@ export default function Sidebar() {
               <IconMessage size={16} className={classes.conversationIcon} />
             }
             rightSection={
-              <IconChevronRight size={14} className={classes.chevronIcon} />
+              <Group spacing={2} noWrap>
+                <ActionIcon
+  size="sm"
+  variant="subtle"
+  color="gray"
+  onClick={e => {
+    e.stopPropagation();
+    setSelectedConv(conv);
+    setEditModalOpened(true);
+  }}
+>
+  <IconEdit size={15} />
+</ActionIcon>
+                <IconChevronRight size={14} className={classes.chevronIcon} />
+              </Group>
             }
           />
         ))}
       </Navbar.Section>
+      
+      <ConversationEditModal
+        opened={editModalOpened}
+        onClose={() => setEditModalOpened(false)}
+        conversation={selectedConv}
+        onRename={async (newTitle) => {
+          if (!selectedConv) return false;
+          setLoading(true);
+          try {
+            await api.patch(`/conversations/${selectedConv.id}`, { title: newTitle });
+            setConversations(
+              conversations.map(c => c.id === selectedConv.id ? { ...c, title: newTitle } : c)
+            );
+            setLoading(false);
+            return true;
+          } catch (e) {
+            if (typeof window !== 'undefined') {
+              const { showNotification } = await import('@mantine/notifications');
+              showNotification({
+                title: '이름 변경 실패',
+                message: e?.response?.data?.message || e?.message || '알 수 없는 오류',
+                color: 'red',
+              });
+            }
+            setLoading(false);
+            return false;
+          }
+        }}
+        onDelete={async () => {
+          if (!selectedConv) return;
+          setLoading(true);
+          try {
+            await api.delete(`/conversations/${selectedConv.id}`);
+            removeConversation(selectedConv.id);
+            // 삭제된 대화가 현재 선택된 대화라면 라우팅
+            if (router.query.id === selectedConv.id) {
+              router.push('/');
+            }
+          } catch (e) {
+            // TODO: notification
+          }
+          setLoading(false);
+        }}
+      />
     </Navbar>
   );
-} 
+}
