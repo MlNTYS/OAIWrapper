@@ -4,6 +4,8 @@ const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const { createAccessToken, createRefreshToken, parseExpiresIn } = require('./utils');
 const authMiddleware = require('./middleware');
+const validate = require('../middlewares/validate');
+const { check } = require('express-validator');
 
 const router = express.Router();
 
@@ -65,4 +67,29 @@ router.get('/me', authMiddleware, async (req, res) => {
   return res.json(user);
 });
 
-module.exports = router; 
+// 비밀번호 변경
+router.put(
+  '/me/password',
+  authMiddleware,
+  validate([
+    check('currentPassword').notEmpty().withMessage('현재 비밀번호를 입력해주세요'),
+    check('newPassword').isLength({ min: 8 }).withMessage('새 비밀번호는 최소 8자 이상이어야 합니다'),
+  ]),
+  async (req, res, next) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const user = await prisma.user.findUnique({ where: { id: req.userId } });
+      // 현재 비밀번호 확인
+      const valid = await argon2.verify(user.password_hash, currentPassword);
+      if (!valid) return res.status(400).json({ error: '현재 비밀번호가 일치하지 않습니다' });
+      // 새 비밀번호 해싱 및 저장
+      const hash = await argon2.hash(newPassword);
+      await prisma.user.update({ where: { id: req.userId }, data: { password_hash: hash } });
+      return res.sendStatus(204);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+module.exports = router;

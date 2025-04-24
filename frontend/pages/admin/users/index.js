@@ -41,6 +41,8 @@ export default function AdminUsersPage() {
     }
   );
 
+  const [confirmUserToDelete, setConfirmUserToDelete] = useState(null);
+
   return (
     <AdminLayout>
       <Container mt="md">
@@ -95,7 +97,7 @@ export default function AdminUsersPage() {
                   <td>
                     <Group spacing="xs">
                       <Button size="xs" onClick={() => { setEditUser(user); setEditRole(user.role_id); setEditVerified(user.is_verified); setEditCredit(user.current_credit); setEditOpened(true); }}>수정</Button>
-                      <Button color="red" size="xs" loading={deleteUser.isLoading} onClick={() => deleteUser.mutate(user.id)}>삭제</Button>
+                      <Button color="red" size="xs" loading={deleteUser.isLoading} onClick={() => setConfirmUserToDelete(user.id)}>삭제</Button>
                     </Group>
                   </td>
                 </tr>
@@ -103,6 +105,13 @@ export default function AdminUsersPage() {
             </tbody>
           </Table>
         )}
+        <Modal opened={!!confirmUserToDelete} onClose={() => setConfirmUserToDelete(null)} title="정말 삭제하시겠습니까?" centered>
+          <Text>삭제하면 복구할 수 없습니다.</Text>
+          <Group position="right" mt="md">
+            <Button variant="default" onClick={() => setConfirmUserToDelete(null)}>취소</Button>
+            <Button color="red" loading={deleteUser.isLoading} onClick={() => { deleteUser.mutate(confirmUserToDelete); setConfirmUserToDelete(null); }}>삭제</Button>
+          </Group>
+        </Modal>
       </Container>
     </AdminLayout>
   );

@@ -340,6 +340,10 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
           )}
         </Group>
       </Box>
-    </Box>
+    {/* 안내 문구 추가 */}
+    <div style={{ marginTop: '8px', textAlign: 'center', color: '#ffb300', fontSize: '0.95em', opacity: 0.85 }}>
+    AI는 실수할 수 있습니다. 중요한 정보는 확인하세요.
+    </div>
+  </Box>
   );
 } 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Modal, TextInput, NumberInput, Switch, Select, Textarea } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { Modal, TextInput, NumberInput, Switch, Select, Textarea, Paper } from '@mantine/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Container, Title, Table, Switch as InlineSwitch, NumberInput as InlineNumberInput, Select as InlineSelect, TextInput as InlineTextInput, Button, Group, Text } from '@mantine/core';
 import AdminLayout from '../../../components/AdminLayout';
@@ -69,9 +69,40 @@ export default function AdminModelsPage() {
     setEditOpened(true);
   };
 
+  const [confirmModelToDelete, setConfirmModelToDelete] = useState(null);
+
+  const { data: globalConfig, isLoading: isGlobalLoading } = useQuery(
+    ['globalConfig'],
+    () => api.get('/config').then((res) => res.data),
+    { staleTime: 1000 * 60 }
+  );
+  const updateGlobalConfig = useMutation(
+    (systemMessage) => api.put('/config', { systemMessage }),
+    { onSuccess: () => queryClient.invalidateQueries(['globalConfig']) }
+  );
+  const [globalMessage, setGlobalMessage] = useState('');
+  useEffect(() => {
+    if (globalConfig) setGlobalMessage(globalConfig.systemMessage || '');
+  }, [globalConfig]);
+
   return (
     <AdminLayout>
       <Container mt="md">
+        {/* Global System Message 관리 */}
+        <Paper shadow="xs" p="md" mb="md">
+          <Text size="sm" weight={500} mb="xs">Global System Message</Text>
+          <Textarea
+            value={globalMessage}
+            onChange={(e) => setGlobalMessage(e.currentTarget.value)}
+            placeholder="Enter global system message"
+            autosize
+            minRows={3}
+            disabled={isGlobalLoading || updateGlobalConfig.isLoading}
+          />
+          <Button fullWidth mt="sm" loading={updateGlobalConfig.isLoading} onClick={() => updateGlobalConfig.mutate(globalMessage)}>
+            저장
+          </Button>
+        </Paper>
         <Group position="apart" mb="md">
           <Title order={3}>모델 관리</Title>
           <Button onClick={() => setCreateOpened(true)}>모델 추가</Button>
@@ -244,7 +275,7 @@ export default function AdminModelsPage() {
                       <Button
                         size="sm"
                         color="red"
-                        onClick={() => deleteModel.mutate(m.id)}
+                        onClick={() => setConfirmModelToDelete(m.id)}
                         loading={deleteModel.isLoading}
                       >
                         삭제
@@ -256,6 +287,13 @@ export default function AdminModelsPage() {
             </tbody>
           </Table>
         )}
+        <Modal opened={!!confirmModelToDelete} onClose={() => setConfirmModelToDelete(null)} title="정말 삭제하시겠습니까?" centered>
+          <Text>삭제하면 복구할 수 없습니다.</Text>
+          <Group position="right" mt="md">
+            <Button variant="default" onClick={() => setConfirmModelToDelete(null)}>취소</Button>
+            <Button color="red" loading={deleteModel.isLoading} onClick={() => { deleteModel.mutate(confirmModelToDelete); setConfirmModelToDelete(null); }}>삭제</Button>
+          </Group>
+        </Modal>
       </Container>
     </AdminLayout>
   );

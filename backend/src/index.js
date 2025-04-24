@@ -13,6 +13,7 @@ const csurf = require('csurf');
 const chatRoutes = require('./chat/routes');
 const modelRoutes = require('./models/routes');
 const conversationRoutes = require('./conversations/routes');
+const configRoutes = require('./config/routes');
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/chat', csrfProtection, setCsrfCookie, chatRoutes);
 app.use('/api/models', csrfProtection, setCsrfCookie, modelRoutes);
 app.use('/api/conversations', csrfProtection, setCsrfCookie, conversationRoutes);
+app.use('/api/config', csrfProtection, setCsrfCookie, configRoutes);
 
 // 에러 핸들러 등록
 app.use(errorHandler);

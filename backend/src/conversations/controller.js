@@ -4,16 +4,29 @@ const prisma = require('../prisma');
 async function getConversations(req, res, next) {
   try {
     const { userId, userRole } = req;
+    const allParam = req.query.all === 'true';
     let conversations;
-    if (userRole === 'ADMIN') {
+    if (userRole === 'ADMIN' && allParam) {
       conversations = await prisma.conversation.findMany({
-        select: { id: true, title: true, updated_at: true, total_tokens: true },
+        select: {
+          id: true,
+          title: true,
+          updated_at: true,
+          total_tokens: true,
+          user: { select: { id: true, email: true } },
+        },
         orderBy: { updated_at: 'desc' },
       });
     } else {
       conversations = await prisma.conversation.findMany({
         where: { user_id: userId },
-        select: { id: true, title: true, updated_at: true, total_tokens: true },
+        select: {
+          id: true,
+          title: true,
+          updated_at: true,
+          total_tokens: true,
+          user: { select: { id: true, email: true } },
+        },
         orderBy: { updated_at: 'desc' },
       });
     }

@@ -60,55 +60,25 @@ router.post(
       return res.status(400).json({ error: '잘못된 요청입니다.' });
     }
 
+    // Pre-check credit before title generation
+    const creditUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (creditUser.current_credit < modelInfo.cost) {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: '크레딧이 부족합니다.' })}\n\n`);
+      clearInterval(heartbeat);
+      res.end();
+      return;
+    }
+
     let convId = conversationId;
     // Conversation 생성/확인
     if (!convId) {
       const conv = await prisma.conversation.create({ data: { user_id: userId, last_model_id: modelInfo.id } });
       convId = conv.id;
-      // 자동 제목 생성
-      try {
-        const firstUser = messages.find(m => m.role === 'user');
-        const titlePrompt = firstUser?.content || messages.map(m => m.content).join('\n');
-        const titleRes = await axios.post(OPENAI_API,
-          { model: 'gpt-4.1-mini-2025-04-14', messages: [
-              { role: 'system', content: 'Generate a short title for this conversation. Do not answer it directly, Write it in language of the conversation.' },
-              { role: 'user', content: titlePrompt }
-            ], max_tokens: 10 },
-          { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
-        );
-        const title = titleRes.data.choices[0].message.content.trim();
-        await prisma.conversation.update({ where: { id: convId }, data: { title } });
-      } catch {
-        await prisma.conversation.update({ where: { id: convId }, data: { title: 'Untitled' } });
-      }
     } else {
       // 기존 대화 확인 및 권한 체크
       let conv = await prisma.conversation.findUnique({ where: { id: convId } });
       if (!conv || (req.userRole !== 'ADMIN' && conv.user_id !== userId)) {
         return res.sendStatus(403);
-      }
-      // title이 아직 없는 경우 자동 생성
-      if (!conv.title) {
-        try {
-          const firstUser = messages.find(m => m.role === 'user');
-          const titlePrompt = firstUser?.content || messages.map(m => m.content).join('\n');
-          const titleRes = await axios.post(
-            OPENAI_API,
-            {
-              model: 'gpt-4.1-nano-2025-04-14',
-              messages: [
-                { role: 'system', content: 'Generate a short title for given user conversation. Do not answer it directly, just generate the title. Write it in language of the conversation.' },
-                { role: 'user', content: titlePrompt }
-              ],
-              max_tokens: 10
-            },
-            { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
-          );
-          const title = titleRes.data.choices[0].message.content.trim();
-          await prisma.conversation.update({ where: { id: convId }, data: { title } });
-        } catch {
-          await prisma.conversation.update({ where: { id: convId }, data: { title: 'Untitled' } });
-        }
       }
     }
     // User message saving with token count
@@ -138,12 +108,41 @@ router.post(
     // 크레딧 확인
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (user.current_credit < modelInfo.cost) {
-      return res.status(403).json({ error: '크레딧이 부족합니다.' });
+      // Insufficient credit: send SSE error
+      res.write(`event: error\ndata: ${JSON.stringify({ error: '크레딧이 부족합니다.' })}\n\n`);
+      clearInterval(heartbeat);
+      res.end();
+      return;
     }
 
     // 크레딧 즉시 차감 및 ledger 기록
     await prisma.user.update({ where: { id: userId }, data: { current_credit: user.current_credit - modelInfo.cost } });
     await prisma.creditLedger.create({ data: { user_id: userId, delta: -modelInfo.cost, reason: 'usage' } });
+
+    // 제목 생성은 스트리밍 시작 후 비동기로 수행합니다
+    const convTitle = await prisma.conversation.findUnique({ where: { id: convId }, select: { title: true } });
+    if (!convTitle.title) {
+      try {
+        const firstUser = messages.find(m => m.role === 'user');
+        const titlePrompt = firstUser?.content || messages.map(m => m.content).join('\\n');
+        const titleRes = await axios.post(
+          OPENAI_API,
+          {
+            model: modelInfo.is_inference_model ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-mini-2025-04-14',
+            messages: [
+              { role: 'system', content: 'Generate a short title for this conversation in the language of the conversation.' },
+              { role: 'user', content: titlePrompt }
+            ],
+            max_tokens: 15
+          },
+          { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
+        );
+        const title = titleRes.data.choices[0].message.content.trim();
+        await prisma.conversation.update({ where: { id: convId }, data: { title } });
+      } catch {
+        await prisma.conversation.update({ where: { id: convId }, data: { title: 'Untitled' } });
+      }
+    }
 
     // heartbeat to keep connection alive
     heartbeat = setInterval(() => {
@@ -168,10 +167,15 @@ router.post(
         where: { conversation_id: convId },
         orderBy: { created_at: 'asc' }
       });
-      let callMessages = dbMessages.map(m => ({ role: m.role, content: m.content }));
-      if (modelInfo.system_message) {
-        callMessages.unshift({ role: 'system', content: modelInfo.system_message });
+      const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 1 } });
+      let callMessages = [];
+      if (globalConfig?.systemMessage) {
+        callMessages.push({ role: 'system', content: globalConfig.systemMessage });
       }
+      if (modelInfo.system_message) {
+        callMessages.push({ role: 'system', content: modelInfo.system_message });
+      }
+      callMessages = callMessages.concat(dbMessages.map(m => ({ role: m.role, content: m.content })));
 
       const payload = { model, messages: callMessages, stream: true };
       if (modelInfo.is_inference_model) {
@@ -192,29 +196,52 @@ router.post(
       );
 
       let assistantContent = '';
-
+      let buffer = '';
       openaiRes.data.on('data', (chunk) => {
-        const lines = chunk.toString('utf8').split('\n').filter(line => line.trim());
-        for (const line of lines) {
-          const trimmed = line.replace(/^data: /, '');
-          if (trimmed === '[DONE]') {
+        buffer += chunk.toString('utf8');
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+        for (const part of parts) {
+          if (!part.startsWith('data:')) continue;
+          const dataStr = part.replace(/^data: /, '').trim();
+          if (dataStr === '[DONE]') {
             clearInterval(heartbeat);
             res.write('data: [DONE]\n\n');
             res.end();
             return;
           }
           try {
-            const parsed = JSON.parse(trimmed);
+            const parsed = JSON.parse(dataStr);
             const content = parsed.choices?.[0]?.delta?.content;
             if (content !== undefined) {
               res.write(`data: ${JSON.stringify({ content })}\n\n`);
               assistantContent += content;
             }
-          } catch (err) {}
+          } catch (e) {
+            // incomplete JSON fragment, 무시
+          }
         }
       });
 
       openaiRes.data.on('end', async () => {
+        // flush any remaining buffer fragments
+        if (buffer) {
+          const parts = buffer.split('\n\n');
+          for (const part of parts) {
+            if (!part.startsWith('data:')) continue;
+            const dataStr = part.replace(/^data: /, '').trim();
+            if (dataStr !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(dataStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  res.write(`data: ${JSON.stringify({ content })}\n\n`);
+                  assistantContent += content;
+                }
+              } catch {}
+            }
+          }
+        }
         // Assistant message saving with token count
         const encoding = getEncoder(model);
         const assistantTokenCount = encoding.encode(assistantContent).length;
