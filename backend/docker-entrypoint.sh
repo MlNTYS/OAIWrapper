@@ -13,5 +13,10 @@ npx prisma generate
 echo "Seeding database..."
 npm run seed
 
+echo "Creating and checking image directory..."
+mkdir -p "$IMAGE_DIR"
+ls -la "$IMAGE_DIR"
+echo "IMAGE_DIR=$IMAGE_DIR"
+
 echo "Starting application..."
 exec npm run start 

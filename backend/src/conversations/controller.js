@@ -43,7 +43,10 @@ async function getConversation(req, res, next) {
     const conv = await prisma.conversation.findUnique({
       where: { id: req.params.id },
       include: { 
-        messages: { orderBy: { created_at: 'asc' }, select: { id: true, role: true, content: true, created_at: true } },
+        messages: { 
+          orderBy: { created_at: 'asc' }, 
+          select: { id: true, role: true, content: true, type: true, assetId: true, created_at: true } 
+        },
         last_model: { select: { id: true, api_name: true, name: true, cost: true, is_inference_model: true, reasoning_effort: true } } 
       },
     });

@@ -55,7 +55,7 @@ export default function ModelSelect({ lastModelId }) {
         if (model) setSelected(model);
       }}
       placeholder="모델 선택"
-      style={{ width: 200 }}
+      style={{ width: 300 }}
     />
   );
 } 

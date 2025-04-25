@@ -28,6 +28,7 @@ model User {
   creditLedgers  CreditLedger[]
   usageLogs      UsageLog[]
   conversations  Conversation[]
+  imageAssets    ImageAsset[]
 
   @@map("users")
 }
@@ -111,12 +112,25 @@ model Message {
   id              String       @id @default(uuid()) @db.Uuid
   conversation_id String       @db.Uuid
   role            String
-  content         String
+  content         String?      @map("content")
+  type            String       @default("text")
+  assetId         String?      @map("asset_id")
   token_count     Int @default(0)
   created_at      DateTime     @default(now())
   conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
 
   @@map("messages")
+}
+
+model ImageAsset {
+  assetId    String   @id @map("asset_id")
+  userId     String   @db.Uuid @map("user_id")
+  width      Int
+  height     Int
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("image_assets")
 }
 
 model GlobalConfig {

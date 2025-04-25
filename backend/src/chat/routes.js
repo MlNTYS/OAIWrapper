@@ -8,6 +8,9 @@ const authMiddleware = require('../auth/middleware');
 const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
 const { encoding_for_model, get_encoding } = require("tiktoken");
 const encoderCache = {};
+const fs = require('fs');
+const path = require('path');
+const IMAGE_DIR = process.env.IMAGE_DIR || path.join(process.cwd(), 'images');
 function getEncoder(model) {
   if (encoderCache[model]) return encoderCache[model];
   try {
@@ -48,16 +51,23 @@ router.post(
     let heartbeat;
     const userId = req.userId;
     const { model, messages, conversationId } = req.body;
+    const baseUrl = req.protocol + '://' + req.get('host');
 
     // 모델 정보 조회 및 사용 가능 여부 확인
     const modelInfo = await prisma.model.findUnique({ where: { api_name: model } });
     if (!modelInfo || !modelInfo.is_enabled) {
-      return res.status(400).json({ error: '모델을 사용할 수 없습니다.' });
+      res.write(`event: error\ndata: ${JSON.stringify({ error: '모델을 사용할 수 없습니다.' })}\n\n`);
+      clearInterval(heartbeat);
+      res.end();
+      return;
     }
 
     // 입력 검증
     if (!model || !Array.isArray(messages)) {
-      return res.status(400).json({ error: '잘못된 요청입니다.' });
+      res.write(`event: error\ndata: ${JSON.stringify({ error: '잘못된 요청입니다.' })}\n\n`);
+      clearInterval(heartbeat);
+      res.end();
+      return;
     }
 
     // Pre-check credit before title generation
@@ -78,11 +88,22 @@ router.post(
       // 기존 대화 확인 및 권한 체크
       let conv = await prisma.conversation.findUnique({ where: { id: convId } });
       if (!conv || (req.userRole !== 'ADMIN' && conv.user_id !== userId)) {
-        return res.sendStatus(403);
+        res.write(`event: error\ndata: ${JSON.stringify({ error: '권한이 없습니다.' })}\n\n`);
+        clearInterval(heartbeat);
+        res.end();
+        return;
       }
     }
-    // User message saving with token count
-    const lastUser = Array.isArray(messages) && [...messages].reverse().find(m => m.role === 'user');
+    // 이미지 메시지인 경우 DB에 저장
+    if (Array.isArray(messages)) {
+      for (const m of messages) {
+        if (m.type === 'image' && m.assetId) {
+          await prisma.message.create({ data: { conversation_id: convId, role: 'user', type: 'image', assetId: m.assetId, token_count: 0 } });
+        }
+      }
+    }
+    // find last text message for token accounting
+    const lastUser = Array.isArray(messages) && [...messages].reverse().find(m => m.role === 'user' && m.content);
     if (lastUser) {
       const encoding = getEncoder(model);
       const userTokenCount = encoding.encode(lastUser.content).length;
@@ -128,9 +149,9 @@ router.post(
         const titleRes = await axios.post(
           OPENAI_API,
           {
-            model: modelInfo.is_inference_model ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-mini-2025-04-14',
+            model: 'gpt-4.1-mini-2025-04-14',
             messages: [
-              { role: 'system', content: 'Generate a short title for this conversation in the language of the conversation.' },
+              { role: 'system', content: 'Generate a short title for this conversation in the language of the conversation. Never answer it directly.' },
               { role: 'user', content: titlePrompt }
             ],
             max_tokens: 15
@@ -165,36 +186,130 @@ router.post(
       // Load full conversation for context-aware
       const dbMessages = await prisma.message.findMany({
         where: { conversation_id: convId },
-        orderBy: { created_at: 'asc' }
+        orderBy: { created_at: 'asc' },
+        select: { role: true, content: true, type: true, assetId: true }
       });
       const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 1 } });
       let callMessages = [];
+      const hasNewImageAttachment = messages.some(m => m.type === 'image' && m.assetId);
       if (globalConfig?.systemMessage) {
         callMessages.push({ role: 'system', content: globalConfig.systemMessage });
       }
       if (modelInfo.system_message) {
         callMessages.push({ role: 'system', content: modelInfo.system_message });
       }
-      callMessages = callMessages.concat(dbMessages.map(m => ({ role: m.role, content: m.content })));
+      // 기존 대화 메시지 처리
+      dbMessages.forEach(m => {
+        if (m.type === 'image' && m.assetId && hasNewImageAttachment) {
+          const filePath = path.join(IMAGE_DIR, `${m.assetId}.jpg`);
+          try {
+            if (fs.existsSync(filePath)) {
+              const b64 = fs.readFileSync(filePath).toString('base64');
+              console.log(`[DEBUG] Embedding image ${m.assetId} from ${filePath}, base64 length=${b64.length}`);
+              callMessages.push({
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'high' } }
+                ]
+              });
+            } else {
+              console.log(`[DEBUG] Image file not found: ${filePath}`);
+              callMessages.push({ role: 'user', content: `[이미지를 불러올 수 없습니다: ${m.assetId}]` });
+            }
+          } catch (fileErr) {
+            console.error(`[ERROR] Failed to read image file ${filePath}:`, fileErr);
+            callMessages.push({ role: 'user', content: `[이미지 로딩 오류: ${m.assetId}]` });
+          }
+        } else if (m.type === 'image' && m.assetId) {
+          // 새 이미지 없음: Vision 페이로드로 처리
+          const filePath = path.join(IMAGE_DIR, `${m.assetId}.jpg`);
+          try {
+            if (fs.existsSync(filePath)) {
+              const b64 = fs.readFileSync(filePath).toString('base64');
+              console.log(`[DEBUG] Re-embedding historical image ${m.assetId} as Vision payload`);
+              callMessages.push({
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'auto' } }
+                ]
+              });
+            } else {
+              // 파일이 존재하지 않으면 마크다운 링크로 대체
+              callMessages.push({ role: 'user', content: `![이미지를 찾을 수 없음: ${m.assetId}](${baseUrl}/api/images/${m.assetId})` });
+            }
+          } catch (fileErr) {
+            console.error(`[ERROR] Failed to read historical image ${m.assetId}:`, fileErr);
+            callMessages.push({ role: 'user', content: `[이미지 로딩 오류: ${m.assetId}]` });
+          }
+        } else if (m.content) {
+          callMessages.push({ role: m.role, content: m.content });
+        }
+      });
+      // 새 사용자 메시지 처리
+      messages.forEach(m => {
+        if (m.type === 'image' && m.assetId) {
+          const filePath = path.join(IMAGE_DIR, `${m.assetId}.jpg`);
+          try {
+            if (fs.existsSync(filePath)) {
+              const b64 = fs.readFileSync(filePath).toString('base64');
+              console.log(`[DEBUG] Embedding new user image ${m.assetId} from ${filePath}, base64 length=${b64.length}`);
+              callMessages.push({
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'high' } }
+                ]
+              });
+            } else {
+              console.log(`[DEBUG] New image file not found: ${filePath}`);
+              callMessages.push({ role: 'user', content: `[새 이미지를 불러올 수 없습니다: ${m.assetId}]` });
+            }
+          } catch (fileErr) {
+            console.error(`[ERROR] Failed to read new image file ${filePath}:`, fileErr);
+            callMessages.push({ role: 'user', content: `[새 이미지 로딩 오류: ${m.assetId}]` });
+          }
+        } else if (m.role && m.content) {
+          callMessages.push({ role: m.role, content: m.content });
+        }
+      });
 
+      // payload 생성
       const payload = { model, messages: callMessages, stream: true };
+      const attachmentCount = callMessages.reduce((a, m) => a + (m.attachments?.length || 0), 0);
+      console.log(`[DEBUG] Payload built: messages=${callMessages.length}, attachments=${attachmentCount}`);
       if (modelInfo.is_inference_model) {
         payload.reasoning_effort = modelInfo.reasoning_effort;
       }
-      const openaiRes = await axios.post(
-        OPENAI_API,
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          responseType: 'stream',
-          signal: controller.signal,
-          timeout: 120000
+      console.log(`[DEBUG] OpenAI endpoint: ${OPENAI_API}, API key present: ${!!process.env.OPENAI_API_KEY}`);
+      let openaiRes;
+      try {
+        openaiRes = await axios.post(
+          OPENAI_API,
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            responseType: 'stream',
+            signal: controller.signal,
+            timeout: 120000
+          }
+        );
+      } catch (err) {
+        let errorBody = '';
+        if (err.response?.data && typeof err.response.data.on === 'function') {
+          for await (const chunk of err.response.data) {
+            errorBody += chunk.toString('utf8');
+          }
+          console.error('[DEBUG] OpenAI error body:', errorBody);
+        } else {
+          console.error('[DEBUG] OpenAI request error:', err.message);
         }
-      );
-
+        res.write(`event: error\ndata: ${JSON.stringify({ error: 'OpenAI API 요청 실패', detail: errorBody })}\n\n`);
+        clearInterval(heartbeat);
+        res.end();
+        return;
+      }
       let assistantContent = '';
       let buffer = '';
       openaiRes.data.on('data', (chunk) => {

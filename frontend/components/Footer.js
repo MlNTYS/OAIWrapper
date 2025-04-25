@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Textarea, Group, Button, Flex, Box, createStyles, keyframes } from '@mantine/core';
+import { Textarea, Group, Button, Flex, Box, createStyles, keyframes, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineTheme } from '@mantine/core';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import ModelSelect from './ModelSelect';
 import useModelStore from '../store/useModelStore';
 import { useRouter } from 'next/router';
 import { showNotification } from '@mantine/notifications';
+import { IconPhoto } from '@tabler/icons-react';
 
 const SIDEBAR_WIDTH = 256;          // 사이드바 실제 너비(px)
 
@@ -149,22 +150,45 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
   const [isStreaming, setIsStreaming] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
   const [limitExceeded, setLimitExceeded] = useState(false);
-  const lastUserMessageRef = useRef(null);
   const controllerRef = useRef(null);
   const localConvIdRef = useRef(conversationId);
   const router = useRouter();
   
+  // 이미지 업로드 상태
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // 마지막 전송 메시지 배열 저장
+  const lastMessagesRef = useRef([]);
+
+  // Skip abort on first conversationId change (initial conversation creation)
+  const isFirstConvChange = useRef(true);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); }
+    e.target.value = null;
+  };
+  const handleRemoveFile = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); setSelectedFile(null); setPreviewUrl(null); };
+
   useEffect(() => { localConvIdRef.current = conversationId; }, [conversationId]);
   useEffect(() => {
+    // Skip first run to avoid aborting initial stream
+    if (isFirstConvChange.current) {
+      isFirstConvChange.current = false;
+      return;
+    }
+    // Reset controller on conversation change
     controllerRef.current?.abort();
     setIsStreaming(false);
     setShowRetry(false);
     setLimitExceeded(false);
-    lastUserMessageRef.current = null;
   }, [conversationId]);
+  useEffect(() => { lastMessagesRef.current = []; }, [conversationId]);
   
   // 메시지 전송 및 스트리밍 처리 함수
-  const startStream = async (message, convId) => {
+  const startStream = async (messagesParam, convId) => {
     queryClient.invalidateQueries(['conversations']);
     setIsStreaming(true);
     setShowRetry(false);
@@ -184,13 +208,15 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
       };
+      // Construct absolute stream URL to avoid BodyStreamBuffer aborted errors
+      const streamUrl = `${window.location.origin}/api/chat/stream`;
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/chat/stream`,
+        streamUrl,
         {
           method: 'POST',
           headers,
           credentials: 'include',
-          body: JSON.stringify({ model: selectedModel?.api_name, messages: [message], conversationId: convId }),
+          body: JSON.stringify({ model: selectedModel?.api_name, messages: messagesParam, conversationId: convId }),
           signal: controllerRef.current.signal,
         }
       );
@@ -236,6 +262,8 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
         }
       }
     } catch (err) {
+      // Ignore fetch read AbortError and body stream abort
+      if (err.name === 'AbortError' || (err.message && err.message.includes('BodyStreamBuffer was aborted'))) return;
       console.error(err);
       setShowRetry(true);
     } finally {
@@ -245,11 +273,7 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
 
   // 최초 메시지 전송 핸들러 (첫번째 방식)
   const handleSubmit = async () => {
-    if (!input.trim() || isStreaming || !selectedModel?.api_name || limitExceeded) return;
-    const messageObj = { role: 'user', content: input };
-    // 입력 초기화 및 lastUserMessage 저장
-    setInput('');
-    lastUserMessageRef.current = messageObj;
+    if (isStreaming || !selectedModel?.api_name || limitExceeded || (!input.trim() && !selectedFile)) return;
 
     let convId = localConvIdRef.current;
     if (!convId) {
@@ -266,9 +290,36 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
         return;
       }
     }
-    // 3) 메시지 로컬에 표시 및 스트리밍 시작
-    onSend(messageObj);
-    startStream(messageObj, convId);
+
+    const messagesToSend = [];
+    // 이미지 업로드
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      try {
+        // Upload image and get full URL from backend
+        console.log('Attempting to upload image to:', '/images');
+        console.log('API baseURL:', api.defaults.baseURL);
+        const uploadRes = await api.post('/images', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const { assetId, url } = uploadRes.data;
+        onSend({ role: 'user', type: 'image', assetId, url });
+        messagesToSend.push({ role: 'user', type: 'image', assetId, url });
+        handleRemoveFile();
+      } catch (err) {
+        showNotification({ title: '오류', message: '이미지 업로드 실패', color: 'red', position: 'top-right' });
+        return;
+      }
+    }
+    // 텍스트 메시지
+    if (input.trim()) {
+      const messageObj = { role: 'user', content: input };
+      onSend(messageObj);
+      messagesToSend.push(messageObj);
+      setInput('');
+    }
+    // 마지막 전송 메시지 보관
+    lastMessagesRef.current = messagesToSend;
+    startStream(lastMessagesRef.current, convId);
   };
 
   // 스트림 중단 핸들러
@@ -280,9 +331,9 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
   // 재시도 핸들러
   const handleRetry = () => {
     const convId = localConvIdRef.current;
-    const message = lastUserMessageRef.current;
-    if (convId && message) {
-      startStream(message, convId);
+    const messages = lastMessagesRef.current;
+    if (convId && messages.length > 0) {
+      startStream(messages, convId);
     }
   };
 
@@ -293,9 +344,20 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
   return (
     <Box className={classes.footer}>
       <Box className={classes.footerContent}>
-        <Box mb="xs">
+        <Box mb="xs" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <ModelSelect lastModelId={lastModelId} />
+          <ActionIcon size="lg" variant="light" onClick={() => fileInputRef.current?.click()}>
+            <IconPhoto size={20} />
+          </ActionIcon>
+          {previewUrl && (
+            <Box ml="sm" sx={{ position: 'relative' }}>
+              <img src={previewUrl} alt="preview" style={{ maxHeight: '80px', maxWidth: '80px', borderRadius: 4 }} />
+              <Button size="xs" color="red" variant="filled" onClick={handleRemoveFile} sx={{ position: 'absolute', top: -4, right: -4, minWidth: 0 }}>X</Button>
+            </Box>
+          )}
         </Box>
+        {/* 숨겨진 파일 입력 */}
+        <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
         <Group position="apart" spacing="sm" align="flex-end">
           <Textarea
             placeholder="메시지를 입력하세요..."
@@ -340,10 +402,10 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
           )}
         </Group>
       </Box>
-    {/* 안내 문구 추가 */}
-    <div style={{ marginTop: '8px', textAlign: 'center', color: '#ffb300', fontSize: '0.95em', opacity: 0.85 }}>
-    AI는 실수할 수 있습니다. 중요한 정보는 확인하세요.
-    </div>
-  </Box>
+      {/* 안내 문구 추가 */}
+      <div style={{ marginTop: '8px', textAlign: 'center', color: '#ffb300', fontSize: '0.95em', opacity: 0.85 }}>
+        AI는 실수할 수 있습니다. 중요한 정보는 확인하세요.
+      </div>
+    </Box>
   );
 } 

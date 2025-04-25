@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { Container, Title, Text, Stack, Box, Divider } from '@mantine/core';
+import { Container, Title, Text, Stack, Box, Divider, Image } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
+import { showNotification } from '@mantine/notifications';
 import api from '../../utils/api';
 import Footer from '../../components/Footer';
 import MessageCard from '../../components/MessageCard';
@@ -99,7 +100,20 @@ export default function ConversationPage() {
       })}>
         {/* 메시지 리스트: 로컬 state가 있으면 바로 표시 */}
         {messages.map((msg, idx) => (
-          <MessageCard key={idx} content={msg.content} isUser={msg.role === 'user'} />
+          msg.type === 'image' && msg.assetId ? (
+            <Box key={idx} sx={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
+              <Image
+                src={`/api/images/${msg.assetId}`}
+                alt="uploaded image"
+                radius="md"
+                maxWidth={300}
+                fit="contain"
+                onError={() => showNotification({ title: '오류', message: '이미지 파일이 만료되었습니다.', color: 'red', position: 'top-right' })}
+              />
+            </Box>
+          ) : (
+            <MessageCard key={idx} content={msg.content} isUser={msg.role === 'user'} />
+          )
         ))}
         {/* 서버 로딩 중이고 메시지 없을 때만 로딩 표시 */}
         {isLoading && messages.length === 0 && !isNew && (
