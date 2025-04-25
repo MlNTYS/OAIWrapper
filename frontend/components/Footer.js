@@ -350,10 +350,15 @@ export default function Footer({ conversationId, onSend, onReceive, onTitle, las
             <IconPhoto size={20} />
           </ActionIcon>
           {previewUrl && (
-            <Box ml="sm" sx={{ position: 'relative' }}>
-              <img src={previewUrl} alt="preview" style={{ maxHeight: '80px', maxWidth: '80px', borderRadius: 4 }} />
-              <Button size="xs" color="red" variant="filled" onClick={handleRemoveFile} sx={{ position: 'absolute', top: -4, right: -4, minWidth: 0 }}>X</Button>
-            </Box>
+            <>
+              <Box ml="sm" sx={{ position: 'relative', display: 'inline-block' }}>
+                <img src={previewUrl} alt="preview" style={{ maxHeight: '80px', maxWidth: '80px', borderRadius: 4 }} />
+                <Button size="xs" color="red" variant="filled" onClick={handleRemoveFile} sx={{ position: 'absolute', top: -4, right: -4, minWidth: 0 }}>X</Button>
+              </Box>
+              <Box ml="xs" sx={{ display: 'inline-block', color: '#ffec99', fontSize: 13, fontWeight: 500 }}>
+                아직 이미지는 하나만 첨부할 수 있습니다.
+              </Box>
+            </>
           )}
         </Box>
         {/* 숨겨진 파일 입력 */}

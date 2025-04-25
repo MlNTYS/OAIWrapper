@@ -84,15 +84,15 @@ const useStyles = createStyles((theme) => ({
   menuDropdown: {
     border: `1px solid ${theme.colors.dark[6]}`,
     backgroundColor: theme.colors.dark[8],
-    minWidth: 180,
+    minWidth: 140,
     padding: '8px 0',
   },
   
   menuItem: {
     borderRadius: theme.radius.sm,
-    fontSize: theme.fontSizes.md,
-    padding: '12px 22px',
-    minHeight: 44,
+    fontSize: theme.fontSizes.sm,
+    padding: '8px 16px',
+    minHeight: 36,
     '&:hover': {
       backgroundColor: theme.colors.dark[7],
     }
@@ -198,8 +198,8 @@ export default function Sidebar() {
             }}
           >
             <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" size="lg">
-                <IconSettings size={26} />
+              <ActionIcon size="sm" variant="subtle" color="gray">
+                <IconSettings size={18} />
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
@@ -212,7 +212,7 @@ export default function Sidebar() {
               
               <Menu.Item 
                 color="red"
-                icon={<IconLogout size={26} />}
+                icon={<IconLogout size={18} />}
                 onClick={handleLogout}
               >
                 로그아웃

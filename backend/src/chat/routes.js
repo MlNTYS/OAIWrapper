@@ -8,9 +8,11 @@ const authMiddleware = require('../auth/middleware');
 const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
 const { encoding_for_model, get_encoding } = require("tiktoken");
 const encoderCache = {};
-const fs = require('fs');
-const path = require('path');
-const IMAGE_DIR = process.env.IMAGE_DIR || path.join(process.cwd(), 'images');
+/**
+ * 모델별 토큰 인코딩을 캐시하여 제공
+ * @param {string} model
+ * @returns encoder
+ */
 function getEncoder(model) {
   if (encoderCache[model]) return encoderCache[model];
   try {
@@ -20,7 +22,9 @@ function getEncoder(model) {
   }
   return encoderCache[model];
 }
-
+const fs = require('fs');
+const path = require('path');
+const IMAGE_DIR = process.env.IMAGE_DIR || path.join(process.cwd(), 'images');
 const router = express.Router();
 
 // SSE 스트림 user별 rate limit (1분당 30회)
@@ -94,11 +98,28 @@ router.post(
         return;
       }
     }
-    // 이미지 메시지인 경우 DB에 저장
+    // 이미지 메시지인 경우 DB에 저장 및 토큰 계산
     if (Array.isArray(messages)) {
       for (const m of messages) {
         if (m.type === 'image' && m.assetId) {
-          await prisma.message.create({ data: { conversation_id: convId, role: 'user', type: 'image', assetId: m.assetId, token_count: 0 } });
+          const widthTiles = m.widthTiles || 1;
+          const heightTiles = m.heightTiles || 1;
+          let imageTokenCount = 85 + 170 * widthTiles * heightTiles;
+          if (imageTokenCount < 255) imageTokenCount = 255;
+          const convMeta = await prisma.conversation.findUnique({ where: { id: convId }, select: { total_tokens: true } });
+          const newTotalTokens = convMeta.total_tokens + imageTokenCount;
+          if (newTotalTokens > modelInfo.context_limit) {
+            res.write(`event: error\ndata: ${JSON.stringify({ error: '대화 한도를 초과했습니다.' })}\n\n`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          } else if (newTotalTokens >= Math.floor(modelInfo.context_limit * 0.80)) {
+            res.write(`event: warning\ndata: ${JSON.stringify({ warning: '대화 한도에 거의 도달했습니다.', percent: Math.round(newTotalTokens / modelInfo.context_limit * 100) })}\n\n`);
+          }
+          await prisma.$transaction([
+            prisma.message.create({ data: { conversation_id: convId, role: 'user', type: 'image', assetId: m.assetId, token_count: imageTokenCount } }),
+            prisma.conversation.update({ where: { id: convId }, data: { total_tokens: { increment: imageTokenCount } } })
+          ]);
         }
       }
     }
@@ -151,10 +172,15 @@ router.post(
           {
             model: 'gpt-4.1-mini-2025-04-14',
             messages: [
-              { role: 'system', content: 'Generate a short title for this conversation in the language of the conversation. Never answer it directly.' },
+              { role: 'system', content:
+                'You are a title generator. ' +
+                'When given a conversation snippet, output only the title in the same language—no extra words, no explanations.'
+              },
               { role: 'user', content: titlePrompt }
             ],
-            max_tokens: 15
+            max_tokens: 15,
+            temperature: 0,
+            stop: ['\n']
           },
           { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
         );
@@ -242,32 +268,6 @@ router.post(
             callMessages.push({ role: 'user', content: `[이미지 로딩 오류: ${m.assetId}]` });
           }
         } else if (m.content) {
-          callMessages.push({ role: m.role, content: m.content });
-        }
-      });
-      // 새 사용자 메시지 처리
-      messages.forEach(m => {
-        if (m.type === 'image' && m.assetId) {
-          const filePath = path.join(IMAGE_DIR, `${m.assetId}.jpg`);
-          try {
-            if (fs.existsSync(filePath)) {
-              const b64 = fs.readFileSync(filePath).toString('base64');
-              console.log(`[DEBUG] Embedding new user image ${m.assetId} from ${filePath}, base64 length=${b64.length}`);
-              callMessages.push({
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'high' } }
-                ]
-              });
-            } else {
-              console.log(`[DEBUG] New image file not found: ${filePath}`);
-              callMessages.push({ role: 'user', content: `[새 이미지를 불러올 수 없습니다: ${m.assetId}]` });
-            }
-          } catch (fileErr) {
-            console.error(`[ERROR] Failed to read new image file ${filePath}:`, fileErr);
-            callMessages.push({ role: 'user', content: `[새 이미지 로딩 오류: ${m.assetId}]` });
-          }
-        } else if (m.role && m.content) {
           callMessages.push({ role: m.role, content: m.content });
         }
       });

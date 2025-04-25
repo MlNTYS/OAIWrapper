@@ -91,7 +91,7 @@ export default function ConversationPage() {
       <Box sx={(theme) => ({
         flex: 1,
         padding: theme.spacing.md,
-        paddingBottom: 140, // footer 높이 공간 확보 (내부 패딩)
+        paddingBottom: 210, // footer 높이 공간 더 확보 (내부 패딩)
         width: '100%',
         maxWidth: 800,
         margin: '0 auto',
