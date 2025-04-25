@@ -3,6 +3,7 @@ version: '3.9'
 services:
   traefik:
     image: traefik:v3
+    restart: always
     command:
       - --configFile=/etc/traefik/traefik.yml
     env_file:
@@ -36,6 +37,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: always
     entrypoint: ["./docker-entrypoint.sh"]
     env_file:
       - .env
@@ -61,6 +63,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_ADMIN_PATH: ${NEXT_PUBLIC_ADMIN_PATH}
+    restart: always
     env_file:
       - .env
     environment:
@@ -76,5 +79,5 @@ services:
 
 volumes:
   db_data:
-  letesencrypt:
+  letsencrypt:
   images_data:
