@@ -21,6 +21,8 @@ cd OAIWrapper
 
 * `OPENAI_API_KEY` (필수)
 * JWT 비밀 키 설정 (`JWT_ACCESS_TOKEN_SECRET`, `JWT_REFRESH_TOKEN_SECRET`)
+* 데이터베이스, 도메인, 포트 등 필요에 따라 환경 변수를 수정합니다.
+  자세한 목록은 `.env.example`을 참고하세요.
 
 3. **의존성 설치**
 
@@ -33,10 +35,13 @@ npm install
 4. **애플리케이션 실행**
 
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
 웹 UI는 `http://localhost`에서 접근 가능합니다.
+
+초기 기동 시 컨테이너 내부에서 Prisma 스키마를 데이터베이스에 적용하고 기본
+데이터를 시드합니다.
 
 **기본 관리자 계정:**
 
@@ -98,6 +103,8 @@ Copy `.env.example` to `.env` and set:
 
 * `OPENAI_API_KEY` (required)
 * JWT secrets (`JWT_ACCESS_TOKEN_SECRET`, `JWT_REFRESH_TOKEN_SECRET`)
+* Customize database, domain, and port variables as needed. See `.env.example` for
+  the full list.
 
 3. **Install Dependencies**
 
@@ -110,10 +117,13 @@ npm install
 4. **Run Application**
 
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
 Access the web UI at `http://localhost`.
+
+The container will automatically apply the Prisma schema and seed initial data
+on first start.
 
 **Admin Account:**
 
